@@ -28,3 +28,38 @@ class TransferRequestDTO(BaseModel):
     to_address: str = Field(pattern=r"^0x[a-fA-F0-9]{40}$")
     amount_eth: float = Field(gt=0)
     private_key: str = Field(min_length=64, max_length=66)
+
+
+class TransactionEventDTO(BaseModel):
+    user_id: str
+    wallet_address: str = Field(pattern=r"^0x[a-fA-F0-9]{40}$")
+    amount_usd: float = Field(gt=0)
+    token_symbol: str
+    chain_id: int = Field(gt=0)
+    hour_of_day: int = Field(ge=0, le=23)
+    device_fingerprint: str
+    destination_risk_score: float = Field(ge=0, le=1)
+
+
+class BehaviorEventDTO(BaseModel):
+    user_id: str
+    event_type: str
+    session_id: str
+    geo_country: str
+    platform: str
+    event_ts: int = Field(gt=0)
+
+
+class SwapRecommendationRequestDTO(BaseModel):
+    user_id: str
+    from_token: str
+    to_token: str
+    amount: float = Field(gt=0)
+    slippage_tolerance_bps: int = Field(ge=1, le=500)
+    urgency: str = Field(pattern=r"^(low|medium|high)$")
+
+
+class InferenceResponse(BaseModel):
+    score: float
+    label: str
+    metadata: dict[str, float | str | int]
