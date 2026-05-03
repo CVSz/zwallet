@@ -4,7 +4,9 @@ import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
 
 type Chain = 'ethereum' | 'polygon' | 'arbitrum' | 'solana';
-type DexProvider = '1inch' | 'uniswap-v2' | 'uniswap-v3' | 'jupiter';
+type RouteSource = '1inch' | 'uniswap-v2' | 'uniswap-v3' | 'jupiter' | 'raydium';
+type RiskLevel = 'low' | 'medium' | 'high';
+type TxStepStatus = 'success' | 'failed' | 'skipped';
 
 interface QuoteRequest {
   chain: Chain;
@@ -17,8 +19,8 @@ interface QuoteRequest {
   mevProtection?: boolean;
 }
 
-interface RouteLeg {
-  dex: DexProvider;
+interface NormalizedRouteLeg {
+  source: RouteSource;
   pool: string;
   tokenIn: string;
   tokenOut: string;
@@ -27,21 +29,32 @@ interface RouteLeg {
   feeBps: number;
 }
 
-interface RouteQuote {
+interface NormalizedRoute {
   routeId: string;
   chain: Chain;
-  legs: RouteLeg[];
+  source: RouteSource;
   amountIn: string;
   grossOut: string;
   minOut: string;
-  priceImpactPct: number;
   estimatedGasUsd: number;
-  executionRisk: 'low' | 'medium' | 'high';
-  mev: {
-    privateRpc: boolean;
-    flashbotsBundle: boolean;
-    antiSandwich: string[];
+  priceImpactPct: number;
+  slippageRisk: RiskLevel;
+  executionRisk: RiskLevel;
+  simulation: {
+    ok: boolean;
+    reason?: string;
+    expectedBalanceDeltaOut: string;
   };
+  legs: NormalizedRouteLeg[];
+}
+
+interface ExecutionAttempt {
+  routeId: string;
+  source: RouteSource;
+  status: 'submitted' | 'failed';
+  reason?: string;
+  txHash?: string;
+  steps: Array<{ name: string; status: TxStepStatus; detail: string }>;
 }
 
 const quoteSchema = z.object({
@@ -56,202 +69,173 @@ const quoteSchema = z.object({
 });
 
 const executeSchema = z.object({
-  routeId: z.string(),
+  quoteId: z.string(),
   walletAddress: z.string().min(4),
   maxPriorityFeeGwei: z.number().min(0).optional(),
-  permitSignature: z.string().optional()
+  failSources: z.array(z.enum(['1inch', 'uniswap-v2', 'uniswap-v3', 'jupiter', 'raydium'])).optional()
 });
 
-const approvalSchema = z.object({
-  chain: z.enum(['ethereum', 'polygon', 'arbitrum']),
-  token: z.string().min(2),
-  owner: z.string().min(4),
-  spender: z.string().min(4),
-  amount: z.string().regex(/^\d+(\.\d+)?$/),
-  preferPermit: z.boolean().default(true)
-});
+class SwapRoutingEngine {
+  private routeBook = new Map<string, NormalizedRoute[]>();
 
-class SwapRouterEngine {
-  private routeCache = new Map<string, RouteQuote>();
+  async buildRoutes(request: QuoteRequest): Promise<{ quoteId: string; rankedRoutes: NormalizedRoute[] }> {
+    const rawRoutes = await this.fetchRoutesFromAggregators(request);
+    const normalized = rawRoutes.map((route) => this.normalizeRoute(route, request));
+    const simulated = await Promise.all(normalized.map((route) => this.simulateRoute(route, request)));
+    const viable = simulated.filter((route) => route.simulation.ok);
+    const rankedRoutes = viable.sort((a, b) => this.routeScore(b) - this.routeScore(a));
 
-  async getBestRoute(request: QuoteRequest): Promise<RouteQuote> {
-    const candidates = await this.fetchProviderQuotes(request);
-    const ranked = candidates
-      .map((candidate) => ({
-        ...candidate,
-        score: Number(candidate.grossOut) - candidate.estimatedGasUsd * 0.05 - candidate.priceImpactPct * 10
-      }))
-      .sort((a, b) => b.score - a.score);
-
-    const best = ranked[0];
-    this.routeCache.set(best.routeId, best);
-    return best;
+    const quoteId = randomUUID();
+    this.routeBook.set(quoteId, rankedRoutes);
+    return { quoteId, rankedRoutes };
   }
 
-  getRoute(routeId: string): RouteQuote | undefined {
-    return this.routeCache.get(routeId);
+  getQuoteRoutes(quoteId: string): NormalizedRoute[] {
+    return this.routeBook.get(quoteId) ?? [];
   }
 
-  private async fetchProviderQuotes(request: QuoteRequest): Promise<RouteQuote[]> {
-    const providers = request.chain === 'solana'
-      ? [this.jupiterRoute(request)]
-      : [this.oneInchRoute(request), this.uniswapV2Route(request), this.uniswapV3Route(request)];
-
-    const quotes = await Promise.all(providers);
-    return quotes;
+  private routeScore(route: NormalizedRoute): number {
+    const outScore = Number(route.grossOut) * 100;
+    const gasPenalty = route.estimatedGasUsd * 5;
+    const slippagePenalty = route.slippageRisk === 'low' ? 1 : route.slippageRisk === 'medium' ? 8 : 20;
+    return outScore - gasPenalty - slippagePenalty;
   }
 
-  private baseMev(request: QuoteRequest) {
+  private async fetchRoutesFromAggregators(request: QuoteRequest): Promise<NormalizedRoute[]> {
+    if (request.chain === 'solana') {
+      return Promise.all([this.jupiter(request), this.raydium(request)]);
+    }
+    return Promise.all([this.oneInch(request), this.uniswapV2(request), this.uniswapV3(request)]);
+  }
+
+  private normalizeRoute(route: NormalizedRoute, request: QuoteRequest): NormalizedRoute {
     return {
-      privateRpc: !!request.mevProtection && request.chain !== 'solana',
-      flashbotsBundle: !!request.mevProtection && request.chain === 'ethereum',
-      antiSandwich: [
-        'tight-slippage-threshold',
-        'randomized-deadline-window',
-        'post-trade-price-deviation-check'
-      ]
+      ...route,
+      minOut: this.slippageAdjusted(Number(route.grossOut), request.slippageBps),
+      slippageRisk: route.priceImpactPct <= 0.3 ? 'low' : route.priceImpactPct <= 0.8 ? 'medium' : 'high'
     };
   }
 
-  private async oneInchRoute(request: QuoteRequest): Promise<RouteQuote> {
-    const grossOut = Number(request.amountIn) * 0.992;
-    return {
-      routeId: randomUUID(),
-      chain: request.chain,
-      amountIn: request.amountIn,
-      grossOut: grossOut.toFixed(8),
-      minOut: this.slippageAdjusted(grossOut, request.slippageBps),
-      priceImpactPct: 0.37,
-      estimatedGasUsd: this.dynamicGasUsd(request.chain, request.gasPriceGwei, 180000),
-      executionRisk: 'low',
-      legs: [{
-        dex: '1inch',
-        pool: 'aggregated-path',
-        tokenIn: request.tokenIn,
-        tokenOut: request.tokenOut,
-        shareBps: 10000,
-        expectedOut: grossOut.toFixed(8),
-        feeBps: 30
-      }],
-      mev: this.baseMev(request)
-    };
-  }
+  private async simulateRoute(route: NormalizedRoute, request: QuoteRequest): Promise<NormalizedRoute> {
+    const amount = Number(request.amountIn);
+    const estimatedOut = Number(route.grossOut);
+    if (amount <= 0 || estimatedOut <= 0) {
+      return { ...route, simulation: { ok: false, reason: 'invalid amounts', expectedBalanceDeltaOut: '0' } };
+    }
 
-  private async uniswapV2Route(request: QuoteRequest): Promise<RouteQuote> {
-    const grossOut = Number(request.amountIn) * 0.988;
-    return {
-      routeId: randomUUID(),
-      chain: request.chain,
-      amountIn: request.amountIn,
-      grossOut: grossOut.toFixed(8),
-      minOut: this.slippageAdjusted(grossOut, request.slippageBps),
-      priceImpactPct: 0.52,
-      estimatedGasUsd: this.dynamicGasUsd(request.chain, request.gasPriceGwei, 210000),
-      executionRisk: 'medium',
-      legs: [{
-        dex: 'uniswap-v2',
-        pool: `${request.tokenIn}/${request.tokenOut}`,
-        tokenIn: request.tokenIn,
-        tokenOut: request.tokenOut,
-        shareBps: 10000,
-        expectedOut: grossOut.toFixed(8),
-        feeBps: 30
-      }],
-      mev: this.baseMev(request)
-    };
-  }
+    if (route.estimatedGasUsd > estimatedOut * 0.35) {
+      return { ...route, simulation: { ok: false, reason: 'gas too high vs output', expectedBalanceDeltaOut: route.grossOut } };
+    }
 
-  private async uniswapV3Route(request: QuoteRequest): Promise<RouteQuote> {
-    const legOneOut = Number(request.amountIn) * 0.6 * 0.995;
-    const legTwoOut = Number(request.amountIn) * 0.4 * 0.989;
-    const grossOut = legOneOut + legTwoOut;
-    return {
-      routeId: randomUUID(),
-      chain: request.chain,
-      amountIn: request.amountIn,
-      grossOut: grossOut.toFixed(8),
-      minOut: this.slippageAdjusted(grossOut, request.slippageBps),
-      priceImpactPct: 0.29,
-      estimatedGasUsd: this.dynamicGasUsd(request.chain, request.gasPriceGwei, 260000),
-      executionRisk: 'low',
-      legs: [
-        {
-          dex: 'uniswap-v3',
-          pool: `${request.tokenIn}/WETH@500`,
-          tokenIn: request.tokenIn,
-          tokenOut: 'WETH',
-          shareBps: 6000,
-          expectedOut: legOneOut.toFixed(8),
-          feeBps: 5
-        },
-        {
-          dex: 'uniswap-v3',
-          pool: `WETH/${request.tokenOut}@3000`,
-          tokenIn: 'WETH',
-          tokenOut: request.tokenOut,
-          shareBps: 4000,
-          expectedOut: legTwoOut.toFixed(8),
-          feeBps: 30
-        }
-      ],
-      mev: this.baseMev(request)
-    };
-  }
-
-  private async jupiterRoute(request: QuoteRequest): Promise<RouteQuote> {
-    const hopA = Number(request.amountIn) * 0.7 * 0.996;
-    const hopB = Number(request.amountIn) * 0.3 * 0.992;
-    const grossOut = hopA + hopB;
-
-    return {
-      routeId: randomUUID(),
-      chain: request.chain,
-      amountIn: request.amountIn,
-      grossOut: grossOut.toFixed(8),
-      minOut: this.slippageAdjusted(grossOut, request.slippageBps),
-      priceImpactPct: 0.24,
-      estimatedGasUsd: this.dynamicGasUsd(request.chain, request.gasPriceGwei, 1),
-      executionRisk: 'low',
-      legs: [
-        {
-          dex: 'jupiter',
-          pool: `${request.tokenIn}/SOL`,
-          tokenIn: request.tokenIn,
-          tokenOut: 'SOL',
-          shareBps: 7000,
-          expectedOut: hopA.toFixed(8),
-          feeBps: 4
-        },
-        {
-          dex: 'jupiter',
-          pool: `SOL/${request.tokenOut}`,
-          tokenIn: 'SOL',
-          tokenOut: request.tokenOut,
-          shareBps: 3000,
-          expectedOut: hopB.toFixed(8),
-          feeBps: 6
-        }
-      ],
-      mev: this.baseMev(request)
-    };
+    return { ...route, simulation: { ok: true, expectedBalanceDeltaOut: route.grossOut } };
   }
 
   private slippageAdjusted(amount: number, slippageBps: number): string {
     return (amount * (1 - slippageBps / 10000)).toFixed(8);
   }
 
-  private dynamicGasUsd(chain: Chain, gasPriceGwei = 20, gasUnits = 180000): number {
+  private gasUsd(chain: Chain, gasPriceGwei = 20, gasUnits = 180000): number {
     if (chain === 'solana') return 0.02;
-    const nativeUsd = chain === 'polygon' ? 0.72 : 3200;
-    const gasEth = (gasPriceGwei * gasUnits) / 1e9;
-    const mevPremium = chain === 'ethereum' ? 1.2 : 1;
-    return Number((gasEth * nativeUsd * mevPremium).toFixed(4));
+    const nativeUsd = chain === 'polygon' ? 0.7 : 3200;
+    const gasNative = (gasPriceGwei * gasUnits) / 1e9;
+    return Number((gasNative * nativeUsd).toFixed(6));
+  }
+
+  private baseRoute(request: QuoteRequest, source: RouteSource, grossOut: number, gasUnits: number, priceImpactPct: number, legs: NormalizedRouteLeg[]): NormalizedRoute {
+    return {
+      routeId: randomUUID(),
+      chain: request.chain,
+      source,
+      amountIn: request.amountIn,
+      grossOut: grossOut.toFixed(8),
+      minOut: grossOut.toFixed(8),
+      estimatedGasUsd: this.gasUsd(request.chain, request.gasPriceGwei, gasUnits),
+      priceImpactPct,
+      slippageRisk: 'medium',
+      executionRisk: priceImpactPct <= 0.35 ? 'low' : 'medium',
+      simulation: { ok: true, expectedBalanceDeltaOut: grossOut.toFixed(8) },
+      legs
+    };
+  }
+
+  private async oneInch(request: QuoteRequest): Promise<NormalizedRoute> {
+    const out = Number(request.amountIn) * 0.992;
+    return this.baseRoute(request, '1inch', out, 170000, 0.28, [{ source: '1inch', pool: 'aggregated-path', tokenIn: request.tokenIn, tokenOut: request.tokenOut, shareBps: 10000, expectedOut: out.toFixed(8), feeBps: 30 }]);
+  }
+
+  private async uniswapV2(request: QuoteRequest): Promise<NormalizedRoute> {
+    const out = Number(request.amountIn) * 0.988;
+    return this.baseRoute(request, 'uniswap-v2', out, 210000, 0.49, [{ source: 'uniswap-v2', pool: `${request.tokenIn}/${request.tokenOut}`, tokenIn: request.tokenIn, tokenOut: request.tokenOut, shareBps: 10000, expectedOut: out.toFixed(8), feeBps: 30 }]);
+  }
+
+  private async uniswapV3(request: QuoteRequest): Promise<NormalizedRoute> {
+    const hop1 = Number(request.amountIn) * 0.6 * 0.995;
+    const hop2 = Number(request.amountIn) * 0.4 * 0.989;
+    const out = hop1 + hop2;
+    return this.baseRoute(request, 'uniswap-v3', out, 260000, 0.23, [
+      { source: 'uniswap-v3', pool: `${request.tokenIn}/WETH@500`, tokenIn: request.tokenIn, tokenOut: 'WETH', shareBps: 6000, expectedOut: hop1.toFixed(8), feeBps: 5 },
+      { source: 'uniswap-v3', pool: `WETH/${request.tokenOut}@3000`, tokenIn: 'WETH', tokenOut: request.tokenOut, shareBps: 4000, expectedOut: hop2.toFixed(8), feeBps: 30 }
+    ]);
+  }
+
+  private async jupiter(request: QuoteRequest): Promise<NormalizedRoute> {
+    const out = Number(request.amountIn) * 0.994;
+    return this.baseRoute(request, 'jupiter', out, 1, 0.21, [{ source: 'jupiter', pool: 'jupiter-meta-route', tokenIn: request.tokenIn, tokenOut: request.tokenOut, shareBps: 10000, expectedOut: out.toFixed(8), feeBps: 4 }]);
+  }
+
+  private async raydium(request: QuoteRequest): Promise<NormalizedRoute> {
+    const out = Number(request.amountIn) * 0.991;
+    return this.baseRoute(request, 'raydium', out, 1, 0.38, [{ source: 'raydium', pool: `${request.tokenIn}/${request.tokenOut}`, tokenIn: request.tokenIn, tokenOut: request.tokenOut, shareBps: 10000, expectedOut: out.toFixed(8), feeBps: 25 }]);
+  }
+}
+
+class SwapExecutionPipeline {
+  async executeWithFallback(routes: NormalizedRoute[], walletAddress: string, failSources: RouteSource[] = []): Promise<{ status: 'submitted' | 'failed'; winner?: ExecutionAttempt; attempts: ExecutionAttempt[] }> {
+    const attempts: ExecutionAttempt[] = [];
+
+    for (const route of routes) {
+      const attempt = await this.executeSingleRoute(route, walletAddress, failSources);
+      attempts.push(attempt);
+      if (attempt.status === 'submitted') {
+        return { status: 'submitted', winner: attempt, attempts };
+      }
+    }
+
+    return { status: 'failed', attempts };
+  }
+
+  private async executeSingleRoute(route: NormalizedRoute, walletAddress: string, failSources: RouteSource[]): Promise<ExecutionAttempt> {
+    const steps: ExecutionAttempt['steps'] = [];
+
+    if (route.chain !== 'solana') {
+      steps.push({ name: 'approve-token-if-needed', status: 'success', detail: 'allowance satisfied or approve tx prepared' });
+    } else {
+      steps.push({ name: 'approve-token-if-needed', status: 'skipped', detail: 'solana swaps do not require erc20 approval' });
+    }
+
+    if (failSources.includes(route.source)) {
+      steps.push({ name: 'sign-transaction', status: 'failed', detail: 'simulated signer rejection for fallback testing' });
+      return { routeId: route.routeId, source: route.source, status: 'failed', reason: 'signing failure', steps };
+    }
+
+    steps.push({ name: 'sign-transaction', status: 'success', detail: `signed by ${walletAddress}` });
+    steps.push({ name: 'broadcast', status: 'success', detail: 'transaction relayed to network' });
+
+    return {
+      routeId: route.routeId,
+      source: route.source,
+      status: 'submitted',
+      txHash: `0x${randomUUID().replace(/-/g, '')}`,
+      steps
+    };
   }
 }
 
 const app = Fastify({ logger: true });
-const engine = new SwapRouterEngine();
 await app.register(cors, { origin: true });
+
+const routingEngine = new SwapRoutingEngine();
+const executionPipeline = new SwapExecutionPipeline();
 
 app.get('/health', async () => ({ service: 'swap-service', status: 'ok', timestamp: new Date().toISOString() }));
 
@@ -259,30 +243,16 @@ app.post('/v1/swaps/quote', async (request, reply) => {
   const parsed = quoteSchema.safeParse(request.body);
   if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
-  const quote = await engine.getBestRoute(parsed.data);
-  return {
-    quote,
-    controls: {
-      slippageBps: parsed.data.slippageBps,
-      minOut: quote.minOut,
-      priceImpactPct: quote.priceImpactPct
-    }
-  };
-});
+  const result = await routingEngine.buildRoutes(parsed.data);
+  if (result.rankedRoutes.length === 0) {
+    return reply.code(422).send({ error: 'no viable routes after simulation' });
+  }
 
-app.post('/v1/swaps/approval', async (request, reply) => {
-  const parsed = approvalSchema.safeParse(request.body);
-  if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
-
-  const permitEligible = parsed.data.preferPermit && parsed.data.chain !== 'arbitrum';
   return {
-    approvalRequired: true,
-    flow: permitEligible ? 'permit-signature' : 'onchain-approve',
-    transaction: {
-      to: parsed.data.spender,
-      data: permitEligible ? '0xpermit' : '0x095ea7b3',
-      value: '0x0'
-    }
+    quoteId: result.quoteId,
+    bestRoute: result.rankedRoutes[0],
+    alternatives: result.rankedRoutes.slice(1),
+    rankingPolicy: ['best-output', 'lowest-gas', 'lowest-slippage-risk']
   };
 });
 
@@ -290,23 +260,19 @@ app.post('/v1/swaps/execute', async (request, reply) => {
   const parsed = executeSchema.safeParse(request.body);
   if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
 
-  const cached = engine.getRoute(parsed.data.routeId);
-  if (!cached) return reply.code(404).send({ error: 'route not found or expired' });
+  const routes = routingEngine.getQuoteRoutes(parsed.data.quoteId);
+  if (routes.length === 0) return reply.code(404).send({ error: 'quote not found or expired' });
+
+  const execution = await executionPipeline.executeWithFallback(routes, parsed.data.walletAddress, parsed.data.failSources ?? []);
+  if (execution.status === 'failed') {
+    return reply.code(502).send({ status: execution.status, attempts: execution.attempts, error: 'all routes failed, fallback exhausted' });
+  }
 
   return {
-    status: 'submitted',
-    routeId: cached.routeId,
-    chain: cached.chain,
-    tx: {
-      hash: `0x${randomUUID().replace(/-/g, '')}`,
-      privateRpc: cached.mev.privateRpc,
-      flashbots: cached.mev.flashbotsBundle,
-      maxPriorityFeeGwei: parsed.data.maxPriorityFeeGwei ?? 2
-    },
-    postTradeChecks: {
-      minOutEnforced: cached.minOut,
-      sandwichDeviationGuard: 'enabled'
-    }
+    status: execution.status,
+    attemptCount: execution.attempts.length,
+    selected: execution.winner,
+    attempts: execution.attempts
   };
 });
 
