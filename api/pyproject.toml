@@ -12,11 +12,11 @@ dependencies = [
   "alembic==1.15.2",
   "pyjwt==2.10.1",
   "passlib[bcrypt]==1.7.4",
-  "web3==7.11.1",
+  "web3==7.15.0",
   "httpx==0.28.1",
   "slowapi==0.1.9",
-  "python-multipart==0.0.20",
-  "orjson==3.10.18"
+  "python-multipart==0.0.26",
+  "orjson==3.11.6"
 ]
 
 [tool.pytest.ini_options]
