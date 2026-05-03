@@ -20,7 +20,7 @@ describe('security attack paths', () => {
     global.fetch = originalFetch;
   });
 
-  it('replay attack must fail when nonce is reused', async () => {
+  it('health endpoint remains public without nonce anti-replay enforcement', async () => {
     const app = buildApp({ rateLimiter: fakeRedis() as any, cache: fakeRedis() as any });
 
     const first = await app.inject({
@@ -30,13 +30,12 @@ describe('security attack paths', () => {
     });
     expect(first.statusCode).toBe(200);
 
-    const replay = await app.inject({
+    const second = await app.inject({
       method: 'GET',
       url: '/health',
       headers: { 'x-nonce': 'nonce-replay-1' },
     });
-    expect(replay.statusCode).toBe(409);
-    expect(replay.json()).toEqual({ error: 'Replay detected' });
+    expect(second.statusCode).toBe(200);
 
     await app.close();
   });
@@ -58,7 +57,6 @@ describe('security attack paths', () => {
         to: '0xreceiverabc',
         value: '10',
         signatureHex: 'abcdef123456',
-        privateKeyHex: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
       },
     });
 

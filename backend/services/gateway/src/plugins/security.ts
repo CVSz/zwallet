@@ -39,11 +39,12 @@ export const securityPlugin = fp(async function securityPlugin(app: FastifyInsta
       throw new Error('Invalid token type');
     }
 
-    if (app.revokedRefreshTokens.has(refreshToken)) {
+    const revokedKey = `revoked:${refreshToken}`;
+    const revokedCount = await app.rateLimiter.incr(revokedKey);
+    if (revokedCount > 1) {
       throw new Error('Refresh token revoked');
     }
-
-    app.revokedRefreshTokens.add(refreshToken);
+    await app.rateLimiter.expire(revokedKey, JWT_REFRESH_TTL_SECONDS);
     return app.mintTokens(payload.sub, payload.deviceId);
   });
 
@@ -51,23 +52,27 @@ export const securityPlugin = fp(async function securityPlugin(app: FastifyInsta
     try {
       await req.jwtVerify();
     } catch {
-      reply.code(401).send({ error: 'Unauthorized' });
+      return reply.code(401).send({ error: 'Unauthorized' });
     }
   });
 
   app.addHook('preHandler', async (req, reply) => {
+    if (req.url === '/health' || req.url.startsWith('/v1/auth/')) {
+      return;
+    }
     const nonce = req.headers['x-nonce'];
     if (!nonce || typeof nonce !== 'string') {
       reply.code(400).send({ error: 'Missing anti-replay nonce' });
       return;
     }
 
-    if (app.replay.has(nonce)) {
+    const replayKey = `nonce:${nonce}`;
+    const seen = await app.rateLimiter.incr(replayKey);
+    if (seen > 1) {
       reply.code(409).send({ error: 'Replay detected' });
       return;
     }
-
-    app.replay.add(nonce);
+    await app.rateLimiter.expire(replayKey, NONCE_TTL_SECONDS);
   });
 
   app.addHook('onRequest', async (req, reply) => {
@@ -77,15 +82,16 @@ export const securityPlugin = fp(async function securityPlugin(app: FastifyInsta
       await app.rateLimiter.expire(key, 60);
     }
     if (count > 120) {
-      reply.code(429).send({ error: 'Rate limit exceeded' });
+      return reply.code(429).send({ error: 'Rate limit exceeded' });
     }
   });
 });
+const NONCE_TTL_SECONDS = 300;
+const JWT_REFRESH_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 declare module 'fastify' {
   interface FastifyInstance {
     replay: Set<string>;
-    revokedRefreshTokens: Set<string>;
     rateLimiter: { incr: (key: string) => Promise<number>; expire: (key: string, seconds: number) => Promise<number> };
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
     mintTokens: (userId: string, deviceId: string) => Promise<{ accessToken: string; refreshToken: string }>;

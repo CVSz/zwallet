@@ -19,7 +19,7 @@ describe('unit: core schema logic', () => {
   });
 
   it('accepts valid lifecycle payload', () => {
-    const result = lifecycleCreateSchema.safeParse({ chain: 'evm', from: '0xabcde', to: '0xfedcb', value: '1', signatureHex: 'abcdef1234', privateKeyHex: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' });
+    const result = lifecycleCreateSchema.safeParse({ chain: 'evm', from: '0xabcde', to: '0xfedcb', value: '1', signatureHex: 'abcdef1234' });
     expect(result.success).toBe(true);
   });
 });

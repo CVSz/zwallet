@@ -38,7 +38,6 @@ export const lifecycleCreateSchema = z.object({
   to: z.string().min(5),
   value: z.string(),
   signatureHex: z.string().min(10),
-  privateKeyHex: z.string().min(64),
   forceRpcFailure: z.boolean().optional().default(false)
 });
 

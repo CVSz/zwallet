@@ -16,8 +16,8 @@ app.post('/v1/tx/simulate', async (req, reply) => {
 });
 
 app.post('/v1/tx/verify-signature', async (req, reply) => {
-  const { payload, signatureHex, privateKeyHex } = req.body as { payload: TxPayload; signatureHex: string; privateKeyHex: string };
-  const ok = engine.verifyTransactionSignature(payload, signatureHex, Buffer.from(privateKeyHex, 'hex'));
+  const { payload, signatureHex, signerId } = req.body as { payload: TxPayload; signatureHex: string; signerId: string };
+  const ok = engine.verifyTransactionSignature(payload, signatureHex, Buffer.from(signerId));
   if (!ok) {
     return reply.code(400).send({ verified: false, error: 'Invalid signature' });
   }
