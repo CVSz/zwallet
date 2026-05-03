@@ -1,111 +1,243 @@
-# CODEX_TASKS.md — zWallet Meta Master Task Matrix (Final Release)
+# CODEX_TASKS.md — zWallet End-to-End Task Plan (Docs 00 → 11)
 
-This document is the execution playbook for end-to-end zWallet delivery.
+This plan converts `docs/00_AGENT_CONTRACT.md` through `docs/11_FINAL_EXECUTION.md` into an executable, file-by-file release backlog.
 
-## A) Global Delivery Objective
-Ship secure, test-validated wallet + swap platform features across apps/services/packages/infra with production-grade quality gates.
-
----
-
-## B) Role Matrix (Must Run in Order)
-
-### 1) ARCHITECT
-**Objective:** produce a coherent, low-risk implementation blueprint.
-
-**Required outputs:**
-- Impacted module map (`/apps`, `/services`, `/packages`, `/infra`).
-- API and type contract deltas.
-- Data-flow + trust-boundary notes (especially key management).
-- Risk register: security, migration, performance, compatibility.
-- Test strategy mapped to each changed behavior.
-
-**Exit criteria:**
-- Plan is actionable and dependency order is clear.
+## 0) Program Rules (Source: 00_AGENT_CONTRACT)
+- [ ] Enforce execution loop per task: Analyze → Plan → Implement → Validate → Test → Fix → Output.
+- [ ] Ensure all changes are diff-aware (read before write).
+- [ ] Ban placeholders/TODO stubs in shipped paths.
+- [ ] Require tests after every behavior change.
+- [ ] Capture command + result evidence for each completed task.
 
 ---
 
-### 2) BUILDER
-**Objective:** implement the smallest correct diff that satisfies requirements.
+## 1) Monorepo Foundation (Source: 01_MONOREPO_INIT)
+**Goal:** align repository layout and toolchain with target architecture.
 
-**Required outputs:**
-- Production-ready code (no placeholders).
-- Updated contracts/types and callsites.
-- Config/script/docs updates required to run changes.
-- Backward-compatible behavior unless explicitly broken by task.
+### 1.1 Structure alignment
+- [ ] Verify/create target folders:
+  - `/apps/android`
+  - `/apps/api`
+  - `/services/wallet-engine`
+  - `/services/swap-engine`
+  - `/services/indexer`
+  - `/packages/crypto-core`
+  - `/packages/chain-adapters`
+  - `/packages/shared-types`
+- [ ] Consolidate legacy duplicates (if any) with migration notes.
 
-**Exit criteria:**
-- Code compiles for affected modules and static checks are clean.
+### 1.2 Workspace and strict TypeScript
+- [ ] Validate `pnpm-workspace.yaml` includes all active workspaces.
+- [ ] Enforce strict TS in base tsconfig and service/app overrides.
+- [ ] Add/verify lint config and scripts for workspace-wide checks.
+- [ ] Detect/remove circular dependency chains.
 
----
-
-### 3) AUDITOR
-**Objective:** verify security and correctness before test signoff.
-
-**Required checks:**
-- Input validation on all external boundaries.
-- No secret leakage in logs/errors.
-- Key custody preserved (no private key exfiltration).
-- AuthN/AuthZ assumptions verified.
-- Dependency/config review for unsafe defaults.
-
-**Exit criteria:**
-- No critical/high unresolved findings.
+### 1.3 CI foundation
+- [ ] Add/verify GitHub Actions for lint/test/build matrix.
+- [ ] Ensure caching and deterministic lockfile usage.
 
 ---
 
-### 4) TESTER
-**Objective:** prove behavior with repeatable evidence.
+## 2) Contract-First Backbone (Source: 02_CONTRACT_FIRST)
+**Goal:** single-source contracts across API, events, and persistence.
 
-**Required test layers (as applicable):**
-- Unit tests for core logic.
-- Integration tests for API/service boundaries.
-- E2E for user-critical flows (wallet lifecycle, swap flow).
-- Regression checks for touched bug paths.
+### 2.1 API contracts
+- [ ] Author/refresh OpenAPI spec for wallet, swap, tx, and auth endpoints.
+- [ ] Ensure request/response schemas are versioned.
 
-**Exit criteria:**
-- Relevant tests pass consistently; failures fixed and re-tested.
+### 2.2 Shared validation/types
+- [ ] Define Zod schemas for all external boundaries.
+- [ ] Export schema-derived TS types into shared packages.
+- [ ] Remove `any`/implicit type paths in contract consumers.
 
----
-
-## C) Canonical Execution Pipeline
-1. Scope task + constraints.
-2. Produce implementation plan.
-3. Apply code changes.
-4. Run lint/static validation.
-5. Run build/compile.
-6. Run unit/integration/e2e tests.
-7. Fix defects and re-run affected checks.
-8. Prepare release summary with proof.
+### 2.3 Data/event contracts
+- [ ] Update Prisma schema for persisted entities.
+- [ ] Add event schemas for internal async workflows (indexer/relay/swap).
+- [ ] Add compatibility checks between OpenAPI, Zod, Prisma, and events.
 
 ---
 
-## D) Task Backlog Template (Use Per Feature/Fix)
-For each task, track:
-- **ID/Name**
-- **Owner Role State**: Architect → Builder → Auditor → Tester
-- **Scope Paths**
-- **Contracts Changed**
-- **Security Notes**
-- **Checks Run (commands + status)**
-- **Artifacts** (PR, logs, screenshots if UI changed)
-- **Final Status**: Done / Blocked (with exact blocker)
+## 3) Wallet Engine Implementation (Source: 03_WALLET_ENGINE)
+**Goal:** production-grade multi-chain key + signing engine.
+
+### 3.1 Core crypto features
+- [ ] Implement/verify BIP39 mnemonic flow.
+- [ ] Implement/verify BIP44 derivation paths.
+- [ ] Support EVM, Solana, and Bitcoin address derivation.
+
+### 3.2 Required functions
+- [ ] `deriveAddress()` finalized and chain-tested.
+- [ ] `signTransaction()` finalized and chain-tested.
+- [ ] `verifySignature()` finalized and chain-tested.
+
+### 3.3 Security controls
+- [ ] AES-256-GCM encryption for sensitive wallet payloads.
+- [ ] Zero plaintext secret persistence.
+- [ ] Memory wipe/best-effort cleanup for key material.
+
+### 3.4 Tests
+- [ ] Valid signature tests (per chain).
+- [ ] Invalid signature tests (per chain).
+- [ ] Cross-chain negative validation tests.
 
 ---
 
-## E) Release Readiness Gates
-Release can proceed only if all are true:
-- `docker-compose up` succeeds for the intended environment.
-- Critical E2E flows pass.
-- No unresolved critical/high security issues.
-- No broken build artifacts in impacted modules.
-- Change log / summary is complete and reproducible.
+## 4) Swap Engine Pipeline (Source: 04_SWAP_ENGINE)
+**Goal:** robust route discovery + execution with fault handling.
+
+### 4.1 Routing pipeline
+- [ ] Integrate quote fetchers (1inch/Jupiter adapters).
+- [ ] Normalize routes into shared internal model.
+- [ ] Simulate transactions before execution.
+- [ ] Select optimal route via deterministic scoring.
+- [ ] Execute route with fallback retry strategy.
+
+### 4.2 Failure handling
+- [ ] RPC failure resilience and retry backoff.
+- [ ] Slippage guardrails + rejection logic.
+- [ ] Partial execution detection and recovery behavior.
+
+### 4.3 API endpoints
+- [ ] `POST /quote` contract + implementation + tests.
+- [ ] `POST /execute` contract + implementation + tests.
 
 ---
 
-## F) Definition of Done (DoD)
-A task is done when:
-- Functional requirements are met.
-- Security constraints are preserved.
-- Tests are passing for impacted scope.
-- Operational run path remains healthy.
-- Evidence is documented in final output.
+## 5) Android App Delivery (Source: 05_ANDROID_APP)
+**Goal:** secure Kotlin/Compose client with core wallet flows.
+
+### 5.1 App architecture
+- [ ] Confirm Kotlin + Jetpack Compose + MVVM structure.
+- [ ] Validate navigation/state management for auth→dashboard→actions.
+
+### 5.2 User features
+- [ ] Wallet create/import flow.
+- [ ] Send/receive flow.
+- [ ] Swap UI flow.
+
+### 5.3 Mobile security
+- [ ] Android Keystore integration for key custody.
+- [ ] Biometric unlock flow.
+- [ ] Root detection + policy handling.
+
+---
+
+## 6) Backend API Platform (Source: 06_BACKEND_API)
+**Goal:** secure orchestration API services.
+
+### 6.1 Stack readiness
+- [ ] NestJS service structure and module boundaries.
+- [ ] Prisma connectivity and migrations.
+- [ ] Redis integration for caching/coordination.
+
+### 6.2 Core modules
+- [ ] Auth module (JWT + device binding).
+- [ ] Swap orchestration module.
+- [ ] Transaction relay module.
+
+### 6.3 API security
+- [ ] Zod validation on all request boundaries.
+- [ ] Rate limiting enforced.
+- [ ] Anti-replay controls implemented/tested.
+
+---
+
+## 7) Indexer Service (Source: 07_INDEXER)
+**Goal:** reliable multi-chain ingestion.
+
+### 7.1 Chain coverage
+- [ ] EVM transfer log ingestion.
+- [ ] Solana websocket ingestion.
+- [ ] Bitcoin UTXO ingestion.
+
+### 7.2 Reliability
+- [ ] Idempotent processing semantics.
+- [ ] Deduplication keys + storage strategy.
+- [ ] Reorg/retry-safe cursor handling.
+
+---
+
+## 8) Cross-Cutting Security Hardening (Source: 08_SECURITY)
+**Goal:** enforce defense-in-depth across client/server/blockchain flows.
+
+### 8.1 Mobile
+- [ ] TLS certificate pinning.
+- [ ] Anti-hook/tamper detection checks.
+
+### 8.2 Backend
+- [ ] Vault-based secret management.
+- [ ] JWT key rotation policy + implementation.
+
+### 8.3 Blockchain safety
+- [ ] Mandatory simulation before broadcast where applicable.
+
+### 8.4 Security test mandates
+- [ ] Replay attack test must fail attack path.
+- [ ] Invalid signature test must fail attack path.
+
+---
+
+## 9) DevOps and Runtime (Source: 09_DEVOPS)
+**Goal:** reproducible local + cloud operations.
+
+### 9.1 Containerization
+- [ ] Dockerfiles verified for all runtime services.
+- [ ] `docker-compose` stack wired for local full-flow execution.
+
+### 9.2 Platform deployment
+- [ ] Kubernetes manifests validated (base + overlays).
+- [ ] Terraform plans validated for target environments.
+
+### 9.3 CI pipeline
+- [ ] CI stages: lint → test → build.
+- [ ] Artifact/report retention configured.
+
+---
+
+## 10) Test Program (Source: 10_TESTING)
+**Goal:** complete test pyramid with release evidence.
+
+### 10.1 Unit tests
+- [ ] Wallet engine unit suite.
+- [ ] Swap engine unit suite.
+
+### 10.2 Integration tests
+- [ ] API + DB integration suite.
+- [ ] Service boundary integration checks.
+
+### 10.3 E2E tests
+- [ ] Create wallet flow.
+- [ ] Send transaction flow.
+- [ ] Swap flow.
+
+### 10.4 Quality gates
+- [ ] Define minimum coverage thresholds.
+- [ ] Ensure deterministic CI pass on clean checkout.
+
+---
+
+## 11) Final Execution and Release Signoff (Source: 11_FINAL_EXECUTION)
+**Goal:** prove release readiness end-to-end.
+
+### 11.1 Runtime verification
+- [ ] Run `docker-compose up` for intended stack.
+- [ ] Verify all critical services become healthy.
+
+### 11.2 Full verification pass
+- [ ] Run full automated test suite.
+- [ ] Fix failures and re-run until green.
+
+### 11.3 Release evidence package
+- [ ] Final summary of implemented scope by file/module.
+- [ ] Validation logs (lint/build/schema/security checks).
+- [ ] Test report (unit/integration/e2e outcomes).
+- [ ] Explicit list of residual risks (if any) and mitigations.
+
+---
+
+## Master Exit Criteria (Release Complete)
+Release is complete only when all are true:
+- [ ] Tasks in sections 0–11 are checked done or formally waived with rationale.
+- [ ] No critical/high security findings remain open.
+- [ ] End-to-end flows succeed in runtime and tests.
+- [ ] Documentation and operational runbooks reflect final system behavior.
