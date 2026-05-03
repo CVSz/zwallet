@@ -5,6 +5,9 @@ permissions:
   contents: read
   packages: write
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 on:
   push:
     branches: [main]
@@ -57,8 +60,8 @@ jobs:
     needs: build-and-push
     if: github.ref == 'refs/heads/main'
     env:
-      AWS_REGION: ap-southeast-1
-      EKS_CLUSTER_NAME: zwallet-cluster
+      AWS_REGION: ${{ vars.AWS_REGION || 'ap-southeast-1' }}
+      EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME || 'zwallet-cluster' }}
       K8S_NAMESPACE: default
     steps:
       - uses: actions/checkout@v4
@@ -74,6 +77,15 @@ jobs:
           set -e
           aws sts get-caller-identity
 
+      - name: Validate EKS cluster exists
+        run: |
+          set -e
+          if ! aws eks describe-cluster --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null 2>&1; then
+            echo "::error::EKS cluster '$EKS_CLUSTER_NAME' was not found in region '$AWS_REGION'."
+            echo "Available EKS clusters in $AWS_REGION:"
+            aws eks list-clusters --region "$AWS_REGION" --query "clusters" --output text || true
+            exit 1
+          fi
       - name: Update kubeconfig (ephemeral)
         run: |
           set -e
