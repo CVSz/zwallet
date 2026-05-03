@@ -6,6 +6,19 @@
 - AWS EKS and GCP GKE Terraform stacks in `terraform/aws` and `terraform/gcp`.
 - GitHub Actions CI/CD in `.github/workflows/cicd.yml`.
 
+## Authentication model (secretless deploy)
+- GitHub Actions deploy job uses OpenID Connect (OIDC) with `id-token: write` permission.
+- AWS credentials are minted at runtime through `sts:AssumeRoleWithWebIdentity` (no static cloud keys in GitHub secrets).
+- Kubernetes access is bootstrapped via `aws eks update-kubeconfig` using short-lived AWS credentials only.
+- No long-lived kubeconfig is stored in repository or secret manager for CI.
+
+## AWS trust policy hardening checklist
+1. Restrict audience to STS: `token.actions.githubusercontent.com:aud = sts.amazonaws.com`.
+2. Restrict subject to this repository and branch:
+   - `repo:CVSz/zwallet:ref:refs/heads/main`
+3. Keep branch protection enabled for `main` (required reviewers + status checks).
+4. Avoid mapping deploy role to `system:masters`; bind a namespace-scoped RBAC role for least privilege.
+
 ## Auto-scaling
 - HPA is defined in `k8s/base/gateway-hpa.yaml` with CPU and memory targets.
 
