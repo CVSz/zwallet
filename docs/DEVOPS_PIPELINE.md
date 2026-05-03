@@ -14,10 +14,14 @@
 
 ## AWS trust policy hardening checklist
 1. Restrict audience to STS: `token.actions.githubusercontent.com:aud = sts.amazonaws.com`.
-2. Restrict subject to this repository and branch:
-   - `repo:CVSz/zwallet:ref:refs/heads/main`
-3. Keep branch protection enabled for `main` (required reviewers + status checks).
-4. Avoid mapping deploy role to `system:masters`; bind a namespace-scoped RBAC role for least privilege.
+2. Restrict subject to this repository in trust policy:
+   - Recommended during initial setup/troubleshooting: `repo:CVSz/zwallet:*`
+   - Then harden to specific branches (example):
+     - `repo:CVSz/zwallet:ref:refs/heads/main`
+     - `repo:CVSz/zwallet:ref:refs/heads/dev`
+3. If you get `Not authorized to perform sts:AssumeRoleWithWebIdentity`, verify repository name and case exactly match `CVSz/zwallet`.
+4. Keep branch protection enabled for `main` (required reviewers + status checks).
+5. Avoid mapping deploy role to `system:masters`; bind a namespace-scoped RBAC role for least privilege.
 
 ## Auto-scaling
 - HPA is defined in `k8s/base/gateway-hpa.yaml` with CPU and memory targets.
