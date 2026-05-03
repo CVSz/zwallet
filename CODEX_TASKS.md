@@ -256,3 +256,6 @@ Release is complete only when all are true:
 - Re-ran gateway tests at 16:15 UTC (`npm test` in `backend/services/gateway`): unit security tests passed; integration/e2e suites remained skipped by current Vitest configuration.
 
 - Re-ran workspace verification at 23:02 UTC: `pnpm lint`, `pnpm typecheck`, and `pnpm check:circular` all passed; madge reported no circular dependencies.
+
+- This pass focused on modular verification and checklist correctness only; large portions of sections 2–8 and parts of 10–11 remain incomplete, so full release readiness is not yet achieved.
+- Runtime stack verification remains pending in this environment because `docker-compose` is unavailable.
