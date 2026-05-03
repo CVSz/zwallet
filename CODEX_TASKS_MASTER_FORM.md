@@ -86,3 +86,8 @@ A release can be declared complete only when:
 - Environment blocker already recorded: `docker-compose` unavailable in current container, preventing local stack runtime verification.
 
 This file is the execution form; `CODEX_TASKS.md` remains the source checklist.
+
+## 7) Evidence Logging Discipline
+- Record UTC timestamps for each validation command.
+- Capture commit SHA and branch name per completed work item.
+- Link evidence directly to modified files and test outputs.
