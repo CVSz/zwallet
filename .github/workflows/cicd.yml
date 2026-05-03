@@ -65,13 +65,18 @@ jobs:
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::<ACCOUNT_ID>:role/github-oidc-deploy
+          role-to-assume: arn:aws:iam::171518635073:role/github-oidc-zwallet
           aws-region: ${{ env.AWS_REGION }}
       - name: Configure kubectl
         uses: azure/setup-kubectl@v4
+      - name: Debug AWS identity
+        run: |
+          set -e
+          aws sts get-caller-identity
+
       - name: Update kubeconfig (ephemeral)
         run: |
-          aws sts get-caller-identity
+          set -e
           aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
           kubectl config current-context
       - name: Verify cluster access
