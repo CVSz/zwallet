@@ -53,6 +53,14 @@ export interface TxPayload {
   replayProtection?: ReplayProtection;
 }
 
+
+
+export interface SimulationResult {
+  success: boolean;
+  gasEstimate: string;
+  warnings: string[];
+}
+
 export interface SignedTransaction {
   chain: SupportedChain;
   txHash: string;
@@ -147,6 +155,28 @@ export class WalletEngine {
       txHash,
       rawTransactionHex: raw.toString('hex'),
       signatureHex: signature.toString('hex'),
+    };
+  }
+
+
+
+  verifyTransactionSignature(payload: TxPayload, signatureHex: string, privateKey: Buffer): boolean {
+    const canonical = JSON.stringify(payload);
+    const expected = createHmac('sha256', privateKey).update(canonical).digest();
+    return this.constantTimeEqual(expected, Buffer.from(signatureHex, 'hex'));
+  }
+
+  simulateTransaction(payload: TxPayload): SimulationResult {
+    const warnings: string[] = [];
+    const value = Number(payload.value);
+    if (!Number.isFinite(value) || value <= 0) warnings.push('Invalid transfer value');
+    if (!this.verifyReplayProtection(payload)) warnings.push('Replay protection fields missing');
+    if (payload.to.toLowerCase() === payload.from.toLowerCase()) warnings.push('Self-transfer detected');
+
+    return {
+      success: warnings.length === 0,
+      gasEstimate: this.estimateGas(payload),
+      warnings,
     };
   }
 
