@@ -39,3 +39,7 @@
 - Use `kubectl rollout undo deploy/zwallet-gateway` to revert deployment revision.
 - Re-point service selector to blue if health checks fail.
 - GitHub Actions has automatic rollback step on deployment failure.
+
+## AWS account ID format reminder
+- Use the 12-digit account ID in IAM/CLI/API calls: `171518635073`.
+- Do **not** use the console billing display format with hyphens (for example `1715-1863-5073`) in IAM ARNs or CLI commands.
