@@ -41,3 +41,13 @@ export const lifecycleCreateSchema = z.object({
   privateKeyHex: z.string().min(64),
   forceRpcFailure: z.boolean().optional().default(false)
 });
+
+
+export const refreshSchema = z.object({
+  refreshToken: z.string().min(20)
+});
+
+export const deviceBindSchema = z.object({
+  userId: z.string().uuid(),
+  deviceId: z.string().min(8)
+});
