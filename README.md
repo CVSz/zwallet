@@ -125,3 +125,31 @@ If this repository is not appearing in search/discovery as expected:
 - add release tags and a short project description in repository settings
 - publish a minimal roadmap/issues board so maturity is visible externally
 
+
+
+## Docker end-to-end validation
+
+From repository root:
+
+```bash
+docker compose up --build -d
+```
+
+Then run the required validation tests:
+
+```bash
+cd backend
+npm install
+npm run test:tx-flow
+npm run test:swap-flow
+```
+
+Expected result:
+- `test:tx-flow` completes wallet transaction lifecycle checks (happy path + error branches).
+- `test:swap-flow` completes wallet -> sign -> swap -> broadcast -> index -> portfolio flow.
+
+When finished:
+
+```bash
+docker compose down -v
+```

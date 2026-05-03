@@ -1,10 +1,15 @@
 {
   "name": "zwallet-backend",
   "private": true,
-  "workspaces": ["packages/*", "services/*"],
+  "workspaces": [
+    "packages/*",
+    "services/*"
+  ],
   "scripts": {
     "build": "npm run -ws build",
     "dev": "npm run -ws dev",
-    "lint": "npm run -ws lint"
+    "lint": "npm run -ws lint",
+    "test:tx-flow": "node scripts/tx-lifecycle-test.mjs",
+    "test:swap-flow": "node scripts/swap-execution-test.mjs"
   }
 }
