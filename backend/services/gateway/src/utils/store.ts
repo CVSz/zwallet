@@ -5,5 +5,7 @@ export const store = {
   wallets: [] as Array<Record<string, string>>,
   audit: [] as Array<Record<string, unknown>>,
   txIndex: [] as Array<Record<string, unknown>>,
-  swaps: [] as Array<Record<string, unknown>>
+  swaps: [] as Array<Record<string, unknown>>,
+  balances: new Map<string, number>(),
+  lifecycleTx: new Map<string, Record<string, unknown>>()
 };
