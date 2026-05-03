@@ -31,3 +31,13 @@ export const swapRequestSchema = z.object({
 export const priceSchema = z.object({
   symbol: z.string().min(2)
 });
+
+export const lifecycleCreateSchema = z.object({
+  chain: z.enum(['evm', 'solana', 'bitcoin']),
+  from: z.string().min(5),
+  to: z.string().min(5),
+  value: z.string(),
+  signatureHex: z.string().min(10),
+  privateKeyHex: z.string().min(64),
+  forceRpcFailure: z.boolean().optional().default(false)
+});

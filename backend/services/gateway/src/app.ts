@@ -2,7 +2,7 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { Redis } from 'ioredis';
 import { PrismaClient } from '@prisma/client';
-import { loginSchema, priceSchema, registerSchema, swapRequestSchema, txIndexSchema, walletMetadataSchema } from './schemas/index.js';
+import { lifecycleCreateSchema, loginSchema, priceSchema, registerSchema, swapRequestSchema, txIndexSchema, walletMetadataSchema } from './schemas/index.js';
 import { store } from './utils/store.js';
 import { securityPlugin } from './plugins/security.js';
 
@@ -37,6 +37,93 @@ export const buildApp = (deps: Deps = {}) => {
   app.post('/v1/swaps/orchestrate', { preHandler: [authGuard] }, async (req: any, reply) => { const parsed = swapRequestSchema.safeParse(req.body); if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() }); const swap = { id: crypto.randomUUID(), ...parsed.data, status: 'quoted' }; store.swaps.push(swap); store.audit.push({ action: 'swap.orchestrate', userId: req.user.sub, payload: swap }); return swap; });
   app.get('/v1/prices/:symbol', { preHandler: [authGuard] }, async (req: any, reply) => { const parsed = priceSchema.safeParse(req.params); if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() }); const cacheKey = `price:${parsed.data.symbol}`; const hit = await cache.get(cacheKey); if (hit) return { symbol: parsed.data.symbol, price: Number(hit), source: 'cache' }; const price = Number((Math.random() * 1000).toFixed(2)); await cache.setex(cacheKey, 15, String(price)); store.audit.push({ action: 'price.read', userId: req.user.sub, payload: { symbol: parsed.data.symbol, price } }); return { symbol: parsed.data.symbol, price, source: 'oracle' }; });
   app.get('/v1/audit-logs', { preHandler: [authGuard] }, async () => ({ items: store.audit }));
+
+  app.post('/v1/transactions/lifecycle', { preHandler: [authGuard] }, async (req: any, reply) => {
+    const parsed = lifecycleCreateSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+
+    const txId = crypto.randomUUID();
+    const txBase = process.env.TX_ORCHESTRATOR_URL ?? 'http://tx-orchestrator:8091';
+    const indexerBase = process.env.INDEXER_SERVICE_URL ?? 'http://indexer-service:8093';
+
+    const payload = {
+      chain: parsed.data.chain,
+      from: parsed.data.from,
+      to: parsed.data.to,
+      value: parsed.data.value,
+      replayProtection: parsed.data.chain === 'evm'
+        ? { chainId: 1 }
+        : parsed.data.chain === 'solana'
+          ? { recentBlockhash: 'recent-blockhash' }
+          : { lockTime: Date.now() },
+    };
+
+    const state: Record<string, unknown> = {
+      id: txId,
+      userId: req.user.sub,
+      payload,
+      steps: [
+        { step: 1, name: 'android_create_transaction', status: 'completed' },
+        { step: 2, name: 'wallet_sign_locally', status: 'completed' },
+      ],
+      status: 'created',
+    };
+
+    const verifyRes = await fetch(`${txBase}/v1/tx/verify-signature`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ payload, signatureHex: parsed.data.signatureHex, privateKeyHex: parsed.data.privateKeyHex }),
+    });
+    if (!verifyRes.ok) {
+      state.steps = [...(state.steps as any[]), { step: 3, name: 'backend_validate_request', status: 'failed', error: 'invalid_signature' }];
+      state.status = 'failed';
+      store.lifecycleTx.set(txId, state);
+      return reply.code(400).send({ error: 'invalid_signature', txId, state });
+    }
+
+    state.steps = [...(state.steps as any[]), { step: 3, name: 'backend_validate_request', status: 'completed' }];
+    const senderBalance = store.balances.get(parsed.data.from) ?? 100;
+    const value = Number(parsed.data.value);
+    if (!Number.isFinite(value) || value <= 0 || senderBalance < value) {
+      state.steps = [...(state.steps as any[]), { step: 4, name: 'transaction_broadcast_to_chain', status: 'failed', error: 'insufficient_balance' }];
+      state.status = 'failed';
+      store.lifecycleTx.set(txId, state);
+      return reply.code(400).send({ error: 'insufficient_balance', txId, state, available: senderBalance });
+    }
+
+    if (parsed.data.forceRpcFailure) {
+      state.steps = [...(state.steps as any[]), { step: 4, name: 'transaction_broadcast_to_chain', status: 'failed', error: 'rpc_failure' }];
+      state.status = 'failed';
+      store.lifecycleTx.set(txId, state);
+      return reply.code(502).send({ error: 'rpc_failure', txId, state });
+    }
+
+    const txHash = crypto.createHash('sha256').update(`${txId}:${Date.now()}`).digest('hex');
+    state.steps = [...(state.steps as any[]), { step: 4, name: 'transaction_broadcast_to_chain', status: 'completed', txHash }];
+
+    await fetch(`${indexerBase}/indexer/batch`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ jobs: [{ idempotencyKey: `${txId}:${req.user.sub}`, chain: parsed.data.chain === 'evm' ? 'evm' : parsed.data.chain === 'solana' ? 'solana' : 'bitcoin', addresses: [parsed.data.from, parsed.data.to], cursor: txHash }] }),
+    });
+
+    state.steps = [...(state.steps as any[]), { step: 5, name: 'indexer_detects_transaction', status: 'completed' }];
+    store.balances.set(parsed.data.from, senderBalance - value);
+    store.balances.set(parsed.data.to, (store.balances.get(parsed.data.to) ?? 0) + value);
+
+    state.steps = [...(state.steps as any[]), { step: 6, name: 'api_returns_updated_state', status: 'completed' }, { step: 7, name: 'android_reflects_state', status: 'completed' }];
+    state.status = 'confirmed';
+    state.updatedBalances = { from: store.balances.get(parsed.data.from), to: store.balances.get(parsed.data.to) };
+    store.lifecycleTx.set(txId, state);
+
+    return { txId, state };
+  });
+
+  app.get('/v1/transactions/lifecycle/:txId', { preHandler: [authGuard] }, async (req: any, reply) => {
+    const tx = store.lifecycleTx.get(req.params.txId);
+    if (!tx) return reply.code(404).send({ error: 'not_found' });
+    return { txId: req.params.txId, state: tx };
+  });
 
   app.post('/v1/flow/wallet-sign-swap', { preHandler: [authGuard] }, async (req: any, reply) => {
     const parsed = swapRequestSchema.safeParse(req.body);
