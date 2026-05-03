@@ -1,22 +1,30 @@
-# ZWallet Enterprise Stack
+# zWallet Full-Stack Reference Implementation
 
-## Structure
-- `api/`: FastAPI clean-architecture backend with JWT auth, rate limiting, Ethereum transfer integration.
-- `mobile/`: Expo React Native secure mobile client.
-- `k8s/`: Kubernetes deployment artifacts.
-- `docker-compose.yml`: Local production-like environment.
+This repository now contains a runnable **full-stack scaffold** aligned to `ARCHITECTURE.md`:
 
-## Security Controls
-- Input validation with Pydantic and strict regex patterns.
-- Password hashing with bcrypt.
-- JWT auth with expiration.
-- Rate limiting per IP.
-- Non-root/read-only filesystem in Kubernetes manifest.
-- Secrets pulled from environment / Kubernetes secret.
+- `backend/` — Node.js 22 + TypeScript microservices:
+  - `gateway` (Fastify API edge)
+  - `wallet-service`
+  - `portfolio-service`
+  - `tx-orchestrator`
+  - `swap-service`
+  - `policy-service`
+  - `notify-service`
+- `mobile/` — React Native/Expo client (placeholder for Android-native migration path).
+- `infra/` — Docker Compose + K8s manifests.
 
-## Run
+## Quick start
+
 ```bash
-docker compose up --build
+cd backend
+npm install
+npm run dev
 ```
 
-API: `http://localhost:8080/docs`
+In another shell:
+
+```bash
+cd mobile
+npm install
+npm start
+```
