@@ -2,11 +2,12 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import jwt from '@fastify/jwt';
 import helmet from '@fastify/helmet';
 import csrf from '@fastify/csrf-protection';
+import fp from 'fastify-plugin';
 
 const JWT_ACCESS_TTL = '10m';
 const JWT_REFRESH_TTL = '7d';
 
-export async function securityPlugin(app: FastifyInstance) {
+export const securityPlugin = fp(async function securityPlugin(app: FastifyInstance) {
   const jwtSecret = process.env.JWT_SECRET;
   if (!jwtSecret) {
     throw new Error('JWT secret must be provided by secret manager (Vault)');
@@ -79,7 +80,7 @@ export async function securityPlugin(app: FastifyInstance) {
       reply.code(429).send({ error: 'Rate limit exceeded' });
     }
   });
-}
+});
 
 declare module 'fastify' {
   interface FastifyInstance {
