@@ -103,7 +103,10 @@ jobs:
           fi
       - name: Update kubeconfig (ephemeral)
         run: |
-          set -e
+          set -euo pipefail
+          : "${AWS_REGION:?AWS_REGION is required}"
+          : "${EKS_CLUSTER_NAME:?EKS_CLUSTER_NAME is required}"
+          : "${K8S_NAMESPACE:=default}"
           aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
           kubectl config current-context
       - name: Verify cluster access
@@ -117,6 +120,10 @@ jobs:
       - name: Rollback on failure
         if: failure()
         run: |
+          set -euo pipefail
+          : "${AWS_REGION:?AWS_REGION is required}"
+          : "${EKS_CLUSTER_NAME:?EKS_CLUSTER_NAME is required}"
+          : "${K8S_NAMESPACE:=default}"
           aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
           kubectl config current-context
           kubectl rollout undo deploy/zwallet-gateway -n "$K8S_NAMESPACE"
