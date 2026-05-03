@@ -56,27 +56,36 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-push
     if: github.ref == 'refs/heads/main'
+    env:
+      AWS_REGION: ap-southeast-1
+      EKS_CLUSTER_NAME: zwallet-cluster
+      K8S_NAMESPACE: default
     steps:
       - uses: actions/checkout@v4
       - name: Configure AWS credentials via OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::<ACCOUNT_ID>:role/github-oidc-deploy
-          aws-region: ap-southeast-1
+          aws-region: ${{ env.AWS_REGION }}
       - name: Configure kubectl
         uses: azure/setup-kubectl@v4
       - name: Update kubeconfig (ephemeral)
-        run: aws eks update-kubeconfig --name zwallet-cluster --region ap-southeast-1
+        run: |
+          aws sts get-caller-identity
+          aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
+          kubectl config current-context
       - name: Verify cluster access
         run: kubectl get nodes
       - name: Deploy green
         run: |
-          kubectl apply -f k8s/base
-          kubectl patch service zwallet-gateway -p '{"spec":{"selector":{"app":"zwallet-gateway","track":"green"}}}'
+          kubectl apply -f k8s/base -n "$K8S_NAMESPACE"
+          kubectl patch service zwallet-gateway -n "$K8S_NAMESPACE" -p '{"spec":{"selector":{"app":"zwallet-gateway","track":"green"}}}'
       - name: Validate rollout
-        run: kubectl rollout status deploy/zwallet-gateway --timeout=180s
+        run: kubectl rollout status deploy/zwallet-gateway -n "$K8S_NAMESPACE" --timeout=180s
       - name: Rollback on failure
         if: failure()
         run: |
-          kubectl rollout undo deploy/zwallet-gateway
-          kubectl patch service zwallet-gateway -p '{"spec":{"selector":{"app":"zwallet-gateway","track":"blue"}}}'
+          aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
+          kubectl config current-context
+          kubectl rollout undo deploy/zwallet-gateway -n "$K8S_NAMESPACE"
+          kubectl patch service zwallet-gateway -n "$K8S_NAMESPACE" -p '{"spec":{"selector":{"app":"zwallet-gateway","track":"blue"}}}'
