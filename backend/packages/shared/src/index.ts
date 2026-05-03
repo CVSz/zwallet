@@ -15,3 +15,5 @@ export interface ServiceHealth {
 export const nowIso = () => new Date().toISOString();
 
 export * from './wallet-engine.js';
+
+export * from './indexer.js';
