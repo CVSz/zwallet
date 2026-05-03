@@ -1,0 +1,17 @@
+{
+  "name": "@zwallet/wallet-engine",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "lint": "eslint \"src/**/*.ts\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./walletEngine": "./src/walletEngine.ts"
+  },
+  "dependencies": {
+    "@zwallet/shared-types": "workspace:*"
+  }
+}
