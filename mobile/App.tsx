@@ -1,39 +1,39 @@
 import React, { useState } from 'react';
-import { Button, SafeAreaView, TextInput, Text, View } from 'react-native';
+import { Button, SafeAreaView, Text, TextInput, View } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
 const API = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080';
 
 export default function App() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [status, setStatus] = useState('');
+  const [tenantId, setTenantId] = useState('demo-tenant');
+  const [status, setStatus] = useState('Ready');
+  const [intentId, setIntentId] = useState('');
 
-  async function login() {
-    const res = await fetch(`${API}/v1/auth/login`, {
+  async function createIntent() {
+    const res = await fetch(`${API}/v1/tx/intent`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
+      headers: {
+        'Content-Type': 'application/json',
+        'x-tenant-id': tenantId,
+        'x-tenant-plan': 'pro',
+        'x-tenant-region': 'us-east-1'
+      }
     });
-    if (!res.ok) {
-      setStatus('Login failed');
-      return;
-    }
+    if (!res.ok) return setStatus('Intent failed');
     const data = await res.json();
-    await SecureStore.setItemAsync('access_token', data.access_token, {
-      keychainAccessible: SecureStore.AFTER_FIRST_UNLOCK
-    });
-    setStatus('Logged in securely');
+    setIntentId(data.intentId);
+    await SecureStore.setItemAsync('last_intent', data.intentId);
+    setStatus('Intent created. Ready for on-device signing.');
   }
 
   return (
-    <SafeAreaView style={{ padding: 24 }}>
-      <View style={{ gap: 12 }}>
-        <Text>ZWallet Secure Login</Text>
-        <TextInput autoCapitalize='none' placeholder='Email' value={email} onChangeText={setEmail} />
-        <TextInput secureTextEntry placeholder='Password' value={password} onChangeText={setPassword} />
-        <Button title='Login' onPress={login} />
-        <Text>{status}</Text>
+    <SafeAreaView style={{ padding: 20 }}>
+      <View style={{ gap: 10 }}>
+        <Text>zWallet Multi-chain Client</Text>
+        <TextInput value={tenantId} onChangeText={setTenantId} placeholder='Tenant ID' />
+        <Button title='Create Transaction Intent' onPress={createIntent} />
+        <Text>Status: {status}</Text>
+        <Text>Intent ID: {intentId}</Text>
       </View>
     </SafeAreaView>
   );

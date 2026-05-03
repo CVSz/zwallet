@@ -1,23 +1,26 @@
 services:
-  db:
+  postgres:
     image: postgres:17-alpine
     environment:
       POSTGRES_DB: zwallet
       POSTGRES_USER: zwallet
       POSTGRES_PASSWORD: zwallet
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U zwallet"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-  api:
-    build: ./api
-    environment:
-      SECRET_KEY: change_me_in_prod
-      DATABASE_URL: postgresql+asyncpg://zwallet:zwallet@db:5432/zwallet
-      ETHEREUM_RPC_URL: https://ethereum-rpc.publicnode.com
-      ENVIRONMENT: development
-    ports: ["8080:8080"]
-    depends_on:
-      db:
-        condition: service_healthy
+    ports: ['5432:5432']
+
+  redis:
+    image: redis:7-alpine
+    ports: ['6379:6379']
+
+  nats:
+    image: nats:2.11-alpine
+    command: ["-js"]
+    ports: ['4222:4222']
+
+  gateway:
+    image: node:22-alpine
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+    command: sh -c "npm install && npm run dev --workspace=@zwallet/gateway"
+    ports: ['8080:8080']
+    depends_on: [postgres, redis, nats]
