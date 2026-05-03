@@ -32,7 +32,16 @@ This index provides a clean entrypoint to project documentation and recommended 
 - `DEVOPS_PIPELINE.md`
 - `REVIEW_PREVIEW_REPORT.md`
 - `BUG_REVIEW_2026-05-03.md`
-- `ZWALLET_SUPERIOR_TO_ZYPTO_ARCHITECTURE_V1.md`
+
+## Consolidated Architecture Principles (merged from former `ZWALLET_SUPERIOR_TO_ZYPTO_ARCHITECTURE_V1.md`)
+
+- **Trust boundary**: private keys remain client-side only; no server-side key custody.
+- **Core domain services**: API gateway, policy, wallet registry, tx orchestrator, routing, payments, rewards, treasury, and notifications with deterministic responsibilities.
+- **Data plane**: Postgres (source of truth), Redis (ephemeral), object storage (immutable artifacts), and event streaming for async workflows.
+- **Security controls**: mTLS service mesh, strict redaction, KMS/HSM-backed secret handling, signed artifacts/SBOM, and abuse controls.
+- **Reliability topology**: multi-region runtime, segmented network zones, health-based traffic steering, and SLO-backed observability.
+- **Tokenomics control loops**: emission stabilizer, liquidity health control, growth efficiency control, and risk-off governance switches.
+- **Delivery roadmap**: phased MVP → hardening → governance → scale progression with explicit exit criteria.
 
 ## Root-Level Companion Docs
 

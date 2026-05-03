@@ -1,5 +1,5 @@
 {
-  "name": "@zwallet/api",
+  "name": "@zwallet/router",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -8,13 +8,9 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/intentRouter.ts"
   },
   "dependencies": {
-    "@zwallet/wallet-engine": "workspace:*",
-    "@zwallet/router": "workspace:*",
-    "fastify": "^5.2.1",
-    "@fastify/rate-limit": "^10.3.0",
     "zod": "^3.24.1"
   }
 }
