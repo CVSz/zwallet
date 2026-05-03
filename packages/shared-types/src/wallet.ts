@@ -1,15 +1,7 @@
-export const SUPPORTED_CHAINS = Object.freeze(['evm', 'solana', 'bitcoin'] as const);
+import { SUPPORTED_CHAINS, type SupportedChain, type TransferRequest } from './contracts.js';
 
-export type SupportedChain = (typeof SUPPORTED_CHAINS)[number];
-
-export interface TransferRequest {
-  chain: SupportedChain;
-  from: string;
-  to: string;
-  amountAtomic: string;
-  nonce?: number;
-  createdAt?: string;
-}
+export { SUPPORTED_CHAINS };
+export type { SupportedChain, TransferRequest };
 
 export function isSupportedChain(value: unknown): value is SupportedChain {
   return typeof value === 'string' && SUPPORTED_CHAINS.includes(value as SupportedChain);
