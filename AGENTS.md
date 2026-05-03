@@ -26,6 +26,8 @@ For every user request, run this loop explicitly and internally:
 
 Do not skip steps unless impossible in environment; if blocked, state exact blocker and fallback checks.
 
+Execution loop order is mandatory for every task: Analyze → Plan → Implement → Validate → Test → Fix → Output.
+
 ---
 
 ## 2) Non-Negotiable Rules
@@ -34,6 +36,7 @@ Do not skip steps unless impossible in environment; if blocked, state exact bloc
 - Changes must compile/build for impacted packages.
 - Relevant tests must pass for impacted scope.
 - Keep diffs minimal and targeted (avoid unrelated churn).
+- All edits must be diff-aware: read existing files/state before writing changes.
 - Preserve backward compatibility unless task explicitly allows breaking changes.
 
 ---
@@ -67,6 +70,7 @@ Before concluding, verify:
 - Lint/format consistency for touched files.
 - Build/compile for affected modules.
 - Tests for changed behavior (unit minimum; integration/e2e when applicable).
+- Require explicit command + result evidence for each completed task.
 - Error handling paths and edge cases.
 - No secrets added in code, logs, fixtures, or docs.
 - Developer ergonomics preserved (clear scripts/docs).
