@@ -2,17 +2,14 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import jwt from '@fastify/jwt';
 import helmet from '@fastify/helmet';
 import csrf from '@fastify/csrf-protection';
-import type Redis from 'ioredis';
 
 const JWT_ACCESS_TTL = '10m';
 const JWT_REFRESH_TTL = '7d';
 
 export async function securityPlugin(app: FastifyInstance) {
   const jwtSecret = process.env.JWT_SECRET;
-  const refreshSecret = process.env.JWT_REFRESH_SECRET;
-
-  if (!jwtSecret || !refreshSecret) {
-    throw new Error('JWT secrets must be provided by secret manager (Vault)');
+  if (!jwtSecret) {
+    throw new Error('JWT secret must be provided by secret manager (Vault)');
   }
 
   await app.register(helmet, {
@@ -26,17 +23,17 @@ export async function securityPlugin(app: FastifyInstance) {
 
   await app.register(jwt, {
     secret: jwtSecret,
-    sign: { expiresIn: JWT_ACCESS_TTL, issuer: 'zwallet-gateway', audience: 'zwallet-mobile' },
+    sign: { expiresIn: JWT_ACCESS_TTL },
   });
 
   app.decorate('mintTokens', async function mintTokens(userId: string, deviceId: string) {
     const accessToken = await app.jwt.sign({ sub: userId, deviceId, typ: 'access' });
-    const refreshToken = await app.jwt.sign({ sub: userId, deviceId, typ: 'refresh' }, { secret: refreshSecret, expiresIn: JWT_REFRESH_TTL });
+    const refreshToken = await app.jwt.sign({ sub: userId, deviceId, typ: 'refresh' }, { expiresIn: JWT_REFRESH_TTL });
     return { accessToken, refreshToken };
   });
 
   app.decorate('rotateRefreshToken', async function rotateRefreshToken(refreshToken: string) {
-    const payload = await app.jwt.verify<{ sub: string; deviceId: string; typ: string }>(refreshToken, { secret: refreshSecret });
+    const payload = await app.jwt.verify<{ sub: string; deviceId: string; typ: string }>(refreshToken);
     if (payload.typ !== 'refresh') {
       throw new Error('Invalid token type');
     }
@@ -88,7 +85,7 @@ declare module 'fastify' {
   interface FastifyInstance {
     replay: Set<string>;
     revokedRefreshTokens: Set<string>;
-    rateLimiter: Pick<Redis, 'incr' | 'expire'>;
+    rateLimiter: { incr: (key: string) => Promise<number>; expire: (key: string, seconds: number) => Promise<number> };
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
     mintTokens: (userId: string, deviceId: string) => Promise<{ accessToken: string; refreshToken: string }>;
     rotateRefreshToken: (refreshToken: string) => Promise<{ accessToken: string; refreshToken: string }>;

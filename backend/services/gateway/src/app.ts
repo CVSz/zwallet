@@ -1,6 +1,6 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 import { PrismaClient } from '@prisma/client';
 import { loginSchema, priceSchema, registerSchema, swapRequestSchema, txIndexSchema, walletMetadataSchema } from './schemas/index.js';
 import { store } from './utils/store.js';
@@ -23,7 +23,10 @@ export const buildApp = (deps: Deps = {}) => {
   app.register(securityPlugin);
 
   const authGuard = async (req: any, reply: any) => app.authenticate(req, reply);
-  app.setErrorHandler((error, _req, reply) => reply.code(500).send({ error: 'Internal server error', detail: error.message }));
+  app.setErrorHandler((error, _req, reply) => {
+    const detail = error instanceof Error ? error.message : 'unknown';
+    return reply.code(500).send({ error: 'Internal server error', detail });
+  });
   app.get('/health', async () => ({ service: 'gateway', status: 'ok' }));
   app.post('/v1/auth/register', async (req, reply) => { const parsed = registerSchema.safeParse(req.body); if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() }); const userId = crypto.randomUUID(); store.users.set(parsed.data.email, { id: userId, email: parsed.data.email, password: parsed.data.password }); store.devices.set(userId, new Set([parsed.data.deviceId])); store.audit.push({ action: 'auth.register', userId, payload: parsed.data }); return reply.send({ userId }); });
 
