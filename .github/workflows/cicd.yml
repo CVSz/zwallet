@@ -32,6 +32,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
+      - name: Normalize image owner to lowercase
+        id: image_owner
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -42,7 +45,7 @@ jobs:
           context: backend
           file: backend/services/${{ matrix.service }}/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/zwallet-${{ matrix.service }}:${{ github.sha }}
+          tags: ghcr.io/${{ steps.image_owner.outputs.owner }}/zwallet-${{ matrix.service }}:${{ github.sha }}
 
   deploy-blue-green:
     runs-on: ubuntu-latest
