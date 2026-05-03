@@ -1,31 +1,37 @@
 # zWallet
 
-## Overview
-Multi-chain crypto wallet + swap platform.
+zWallet is a multi-chain wallet and swap platform focused on secure, non-custodial transaction flows for EVM, Solana, and Bitcoin.
 
-## Stack
-- Android (Kotlin)
-- Backend (Node.js + TS)
-- PostgreSQL + Redis
-- Docker + Kubernetes
+## Repository Layout
 
-## Features
-- Multi-chain wallet (EVM, Solana, BTC)
-- Swap engine (DEX aggregation)
-- Secure key management
+- `apps/` — user-facing applications (Android and API entrypoints).
+- `services/` — backend services (wallet, swap, indexer, orchestration).
+- `packages/` — shared libraries, adapters, and types.
+- `infra/` — infrastructure, deployment, and operations assets.
+- `docs/` — architecture, requirements, security, and execution guides.
 
-## Run
+## Quick Start
+
+### Start local stack
+
 ```bash
-docker-compose up
+docker-compose up --build
 ```
 
-## Test
+### Run tests
+
 ```bash
 npm test
 ```
 
-## Structure
-/apps
-/services
-/packages
-/infra
+## Documentation
+
+- High-level architecture: `ARCHITECTURE.md`
+- Documentation index: `docs/README.md`
+- Current review snapshot: `docs/REVIEW_PREVIEW_REPORT.md`
+
+## Security Principles
+
+- Private keys remain on the client side and are never transmitted to backend services.
+- Signing operations are performed on-device.
+- Services validate and enforce policy before accepting broadcast requests.
