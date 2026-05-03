@@ -21,6 +21,7 @@ export const txIndexSchema = z.object({
 });
 
 export const swapRequestSchema = z.object({
+  chain: z.enum(['ethereum','solana','bitcoin']),
   fromToken: z.string(),
   toToken: z.string(),
   amount: z.string(),
