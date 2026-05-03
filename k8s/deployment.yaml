@@ -1,0 +1,31 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zwallet-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels: { app: zwallet-api }
+  template:
+    metadata:
+      labels: { app: zwallet-api }
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/example/zwallet-api:1.0.0
+          ports: [{containerPort: 8080}]
+          envFrom:
+            - secretRef: { name: zwallet-secrets }
+          securityContext:
+            runAsNonRoot: true
+            readOnlyRootFilesystem: true
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zwallet-api
+spec:
+  selector: { app: zwallet-api }
+  ports:
+    - port: 80
+      targetPort: 8080
