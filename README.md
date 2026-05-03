@@ -40,3 +40,24 @@ Project requirement documents are available in `docs/requirements/`:
 - `NON_FUNCTIONAL_REQUIREMENTS.md`
 - `TECHNICAL_REQUIREMENTS.md`
 
+
+## Production flow (fully wired)
+
+The gateway now orchestrates an end-to-end transactional flow:
+
+`Wallet → Sign → Swap → Broadcast → Index → Display`
+
+Single API entrypoint:
+- `POST /v1/flow/wallet-sign-swap` (gateway)
+
+It fan-outs to: wallet-service, policy-service (pre-sign risk policy), swap-service (quote + execute), indexer-service (batch indexing), and portfolio-service (final display projection).
+
+## Deployment
+
+Run all services with docker compose:
+
+```bash
+docker compose up --build
+```
+
+Gateway is exposed on `:8080`. All inter-service URLs are configured via `backend/.env.example`.

@@ -13,14 +13,64 @@ services:
 
   nats:
     image: nats:2.11-alpine
-    command: ["-js"]
+    command: ['-js']
     ports: ['4222:4222']
 
   gateway:
     image: node:22-alpine
     working_dir: /app
-    volumes:
-      - ./backend:/app
+    volumes: [ './backend:/app' ]
     command: sh -c "npm install && npm run dev --workspace=@zwallet/gateway"
+    environment:
+      PORT: 8080
+      REDIS_URL: redis://redis:6379
+      WALLET_SERVICE_URL: http://wallet-service:8090
+      TX_ORCHESTRATOR_URL: http://tx-orchestrator:8091
+      SWAP_SERVICE_URL: http://swap-service:8092
+      INDEXER_SERVICE_URL: http://indexer-service:8093
+      POLICY_SERVICE_URL: http://policy-service:8094
+      PORTFOLIO_SERVICE_URL: http://portfolio-service:8095
     ports: ['8080:8080']
-    depends_on: [postgres, redis, nats]
+    depends_on: [postgres, redis, nats, wallet-service, tx-orchestrator, swap-service, indexer-service, policy-service, portfolio-service]
+
+  wallet-service:
+    image: node:22-alpine
+    working_dir: /app
+    volumes: [ './backend:/app' ]
+    command: sh -c "npm install && npm run dev --workspace=@zwallet/wallet-service"
+    environment: { PORT: 8090 }
+
+  tx-orchestrator:
+    image: node:22-alpine
+    working_dir: /app
+    volumes: [ './backend:/app' ]
+    command: sh -c "npm install && npm run dev --workspace=@zwallet/tx-orchestrator"
+    environment: { PORT: 8091 }
+
+  swap-service:
+    image: node:22-alpine
+    working_dir: /app
+    volumes: [ './backend:/app' ]
+    command: sh -c "npm install && npm run dev --workspace=@zwallet/swap-service"
+    environment: { PORT: 8092 }
+
+  indexer-service:
+    image: node:22-alpine
+    working_dir: /app
+    volumes: [ './backend:/app' ]
+    command: sh -c "npm install && npm run dev --workspace=@zwallet/indexer-service"
+    environment: { PORT: 8093 }
+
+  policy-service:
+    image: node:22-alpine
+    working_dir: /app
+    volumes: [ './backend:/app' ]
+    command: sh -c "npm install && npm run dev --workspace=@zwallet/policy-service"
+    environment: { PORT: 8094 }
+
+  portfolio-service:
+    image: node:22-alpine
+    working_dir: /app
+    volumes: [ './backend:/app' ]
+    command: sh -c "npm install && npm run dev --workspace=@zwallet/portfolio-service"
+    environment: { PORT: 8095 }
