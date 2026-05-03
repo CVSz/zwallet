@@ -208,3 +208,7 @@ This document is the **fully generated execution form** for every checklist item
 - 2026-05-03 23:02 UTC — `pnpm lint` — Passed across all TypeScript workspaces.
 - 2026-05-03 23:02 UTC — `pnpm typecheck` — Passed across all TypeScript workspaces.
 - 2026-05-03 23:02 UTC — `pnpm check:circular` — Passed; no circular dependencies found.
+
+- 2026-05-03 23:46 UTC — `pnpm lint` — Passed across all TypeScript workspaces.
+- 2026-05-03 23:46 UTC — `pnpm typecheck` — Failed in `apps/api` (missing `fastify`, `@fastify/rate-limit`, `zod`; ESM extension + implicit `any` issues).
+- 2026-05-03 23:46 UTC — `pnpm check:circular` — Not run due to prior `pnpm typecheck` failure in chained command.
