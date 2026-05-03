@@ -16,14 +16,13 @@ export const buildApp = (deps: Deps = {}) => {
 
   app.register(cors, { origin: true });
   app.decorate('replay', store.replayTokens);
-  app.decorate('revokedRefreshTokens', new Set<string>());
   app.decorate('rateLimiter', rateLimiter as any);
   app.register(securityPlugin);
 
   const authGuard = async (req: any, reply: any) => app.authenticate(req, reply);
   app.setErrorHandler((error, _req, reply) => {
-    const detail = error instanceof Error ? error.message : 'unknown';
-    return reply.code(500).send({ error: 'Internal server error', detail });
+    app.log.error(error);
+    return reply.code(500).send({ error: 'Internal server error' });
   });
   app.get('/health', async () => ({ service: 'gateway', status: 'ok' }));
   app.post('/v1/auth/register', async (req, reply) => { const parsed = registerSchema.safeParse(req.body); if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() }); const userId = randomUUID(); store.users.set(parsed.data.email, { id: userId, email: parsed.data.email, password: parsed.data.password }); store.devices.set(userId, new Set([parsed.data.deviceId])); store.audit.push({ action: 'auth.register', userId, payload: parsed.data }); return reply.send({ userId }); });
@@ -71,7 +70,7 @@ export const buildApp = (deps: Deps = {}) => {
     const verifyRes = await fetch(`${txBase}/v1/tx/verify-signature`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ payload, signatureHex: parsed.data.signatureHex, privateKeyHex: parsed.data.privateKeyHex }),
+      body: JSON.stringify({ payload, signatureHex: parsed.data.signatureHex, signerId: parsed.data.from }),
     });
     if (!verifyRes.ok) {
       state.steps = [...(state.steps as any[]), { step: 3, name: 'backend_validate_request', status: 'failed', error: 'invalid_signature' }];

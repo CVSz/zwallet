@@ -12,9 +12,9 @@ const req = async (path, options = {}) => {
   return { ok: res.ok, status: res.status, body };
 };
 
-const signPayload = (payload, privateKeyHex) => {
+const signPayload = (payload, signerId) => {
   const canonical = JSON.stringify(payload);
-  return crypto.createHmac('sha256', Buffer.from(privateKeyHex, 'hex')).update(canonical).digest('hex');
+  return crypto.createHmac('sha256', Buffer.from(signerId)).update(canonical).digest('hex');
 };
 
 const run = async () => {
@@ -25,7 +25,6 @@ const run = async () => {
   const token = login.body.accessToken;
   const headers = { 'content-type': 'application/json', authorization: `Bearer ${token}` };
 
-  const privateKeyHex = '11'.repeat(32);
   const from = '0xsender000000000000000000000000000000000001';
   const to = '0xreceiver0000000000000000000000000000000001';
 
@@ -33,24 +32,24 @@ const run = async () => {
 
   console.log('2) Happy path lifecycle');
   const payloadOk = mkPayload('10');
-  const sigOk = signPayload(payloadOk, privateKeyHex);
-  const okFlow = await req('/v1/transactions/lifecycle', { method: 'POST', headers, body: JSON.stringify({ ...payloadOk, signatureHex: sigOk, privateKeyHex }) });
+  const sigOk = signPayload(payloadOk, from);
+  const okFlow = await req('/v1/transactions/lifecycle', { method: 'POST', headers, body: JSON.stringify({ ...payloadOk, signatureHex: sigOk }) });
   console.log(JSON.stringify(okFlow.body, null, 2));
 
   console.log('3) Invalid signature case');
-  const badSig = await req('/v1/transactions/lifecycle', { method: 'POST', headers, body: JSON.stringify({ ...payloadOk, signatureHex: 'deadbeef', privateKeyHex }) });
+  const badSig = await req('/v1/transactions/lifecycle', { method: 'POST', headers, body: JSON.stringify({ ...payloadOk, signatureHex: 'deadbeef' }) });
   console.log(JSON.stringify(badSig.body, null, 2));
 
   console.log('4) Insufficient balance case');
   const payloadBig = mkPayload('1000');
-  const sigBig = signPayload(payloadBig, privateKeyHex);
-  const insufficient = await req('/v1/transactions/lifecycle', { method: 'POST', headers, body: JSON.stringify({ ...payloadBig, signatureHex: sigBig, privateKeyHex }) });
+  const sigBig = signPayload(payloadBig, from);
+  const insufficient = await req('/v1/transactions/lifecycle', { method: 'POST', headers, body: JSON.stringify({ ...payloadBig, signatureHex: sigBig }) });
   console.log(JSON.stringify(insufficient.body, null, 2));
 
   console.log('5) RPC failure case');
   const payloadRpc = mkPayload('5');
-  const sigRpc = signPayload(payloadRpc, privateKeyHex);
-  const rpcFail = await req('/v1/transactions/lifecycle', { method: 'POST', headers, body: JSON.stringify({ ...payloadRpc, signatureHex: sigRpc, privateKeyHex, forceRpcFailure: true }) });
+  const sigRpc = signPayload(payloadRpc, from);
+  const rpcFail = await req('/v1/transactions/lifecycle', { method: 'POST', headers, body: JSON.stringify({ ...payloadRpc, signatureHex: sigRpc, forceRpcFailure: true }) });
   console.log(JSON.stringify(rpcFail.body, null, 2));
 };
 
