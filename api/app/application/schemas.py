@@ -63,3 +63,30 @@ class InferenceResponse(BaseModel):
     score: float
     label: str
     metadata: dict[str, float | str | int]
+
+
+class QuoteRequestDTO(BaseModel):
+    chain: str = Field(min_length=2, max_length=32)
+    from_token: str = Field(min_length=1, max_length=32)
+    to_token: str = Field(min_length=1, max_length=32)
+    amount: float = Field(gt=0)
+    slippage_bps: int = Field(ge=1, le=1000)
+
+
+class QuoteResponseDTO(BaseModel):
+    route_id: str
+    provider: str
+    route: list[str]
+    expected_out: float
+    estimated_gas: int
+    score: float
+
+
+class ExecuteRequestDTO(BaseModel):
+    chain: str = Field(min_length=2, max_length=32)
+    route_id: str = Field(min_length=3, max_length=128)
+    from_token: str = Field(min_length=1, max_length=32)
+    to_token: str = Field(min_length=1, max_length=32)
+    amount: float = Field(gt=0)
+    min_out: float = Field(gt=0)
+    max_retries: int = Field(ge=0, le=3, default=1)
