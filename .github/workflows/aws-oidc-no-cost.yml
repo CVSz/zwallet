@@ -2,7 +2,7 @@ name: AWS Test (No Cost)
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
   workflow_dispatch:
 
 permissions:
