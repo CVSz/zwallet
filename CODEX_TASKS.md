@@ -181,15 +181,15 @@ This plan converts `docs/00_AGENT_CONTRACT.md` through `docs/11_FINAL_EXECUTION.
 **Goal:** reproducible local + cloud operations.
 
 ### 9.1 Containerization
-- [ ] Dockerfiles verified for all runtime services.
-- [ ] `docker-compose` stack wired for local full-flow execution.
+- [x] Dockerfiles verified for all runtime services.
+- [x] `docker-compose` stack wired for local full-flow execution.
 
 ### 9.2 Platform deployment
-- [ ] Kubernetes manifests validated (base + overlays).
-- [ ] Terraform plans validated for target environments.
+- [x] Kubernetes manifests validated (base + overlays).
+- [x] Terraform plans validated for target environments.
 
 ### 9.3 CI pipeline
-- [ ] CI stages: lint → test → build.
+- [x] CI stages: lint → test → build.
 - [ ] Artifact/report retention configured.
 
 ---
