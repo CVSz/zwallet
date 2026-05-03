@@ -250,3 +250,7 @@ Release is complete only when all are true:
 - Verified workspace globs in `pnpm-workspace.yaml` include `apps/*`, `services/*`, and `packages/*` (plus backend scopes).
 - Ran gateway test suite (`npm test` in `backend/services/gateway`): unit security tests passed; integration/e2e suites are present but skipped by current test configuration.
 - Could not execute `docker-compose up` because `docker-compose` is not installed in this container.
+
+- Re-verified required monorepo directory scaffold via shell assertions (`structure_ok`).
+- Re-confirmed workspace package globs in `pnpm-workspace.yaml` cover apps/services/packages and backend scopes.
+- Re-ran gateway tests at 16:15 UTC (`npm test` in `backend/services/gateway`): unit security tests passed; integration/e2e suites remained skipped by current Vitest configuration.
