@@ -16,8 +16,12 @@ from app.application.schemas import (
     TokenResponse,
     TransactionEventDTO,
     TransferRequestDTO,
+    QuoteRequestDTO,
+    QuoteResponseDTO,
+    ExecuteRequestDTO,
 )
 from app.application.services import AuthService, WalletService
+from app.application.swap import SwapOrchestrator, SwapExecutionError
 from app.infrastructure.blockchain import EthereumClient
 from app.infrastructure.db import engine, Base
 from app.infrastructure.repositories import UserRepository
@@ -118,3 +122,26 @@ async def swap_recommendation_inference(
         amount=payload.amount,
     )
     return InferenceResponse(**result)
+
+
+@app.post("/quote", response_model=list[QuoteResponseDTO])
+@limiter.limit("30/minute")
+async def quote(payload: QuoteRequestDTO, _: str = Depends(require_user)) -> list[QuoteResponseDTO]:
+    orchestrator = SwapOrchestrator()
+    quotes = orchestrator.fetch_quotes(payload.from_token, payload.to_token, payload.amount, payload.slippage_bps)
+    normalized = orchestrator.normalize_routes(quotes)
+    return [QuoteResponseDTO(**quote.__dict__) for quote in normalized]
+
+
+@app.post("/execute")
+@limiter.limit("20/minute")
+async def execute(payload: ExecuteRequestDTO, _: str = Depends(require_user)) -> dict:
+    orchestrator = SwapOrchestrator()
+    quotes = orchestrator.fetch_quotes(payload.from_token, payload.to_token, payload.amount, slippage_bps=100)
+    candidates = [q for q in orchestrator.normalize_routes(quotes) if q.route_id == payload.route_id]
+    if not candidates:
+        candidates = orchestrator.normalize_routes(quotes)
+    try:
+        return orchestrator.execute_with_fallback(candidates, min_out=payload.min_out, max_retries=payload.max_retries)
+    except SwapExecutionError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
