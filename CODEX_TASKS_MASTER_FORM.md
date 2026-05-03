@@ -57,11 +57,11 @@ This document is the **fully generated execution form** for every checklist item
 - 1.2.1 Validate `pnpm-workspace.yaml` includes active workspaces.
   - Status: Done
 - 1.2.2 Enforce strict TS in base and overrides.
-  - Status: Not started
+  - Status: Done
 - 1.2.3 Add/verify lint config and workspace scripts.
-  - Status: Not started
+  - Status: Done
 - 1.2.4 Detect/remove circular dependencies.
-  - Status: Not started
+  - Status: Done
 
 ### 1.3 CI foundation
 - 1.3.1 Add/verify GitHub Actions lint/test/build matrix.
@@ -204,3 +204,7 @@ This document is the **fully generated execution form** for every checklist item
 - Partial progress: Sections `0`, `1`, `9`, `10`, `11`.
 - Mostly not started: Sections `2`, `3`, `4`, `5`, `6`, `7`, `8`.
 - Local environment blocker: `docker-compose` unavailable in current container.
+
+- 2026-05-03 23:02 UTC — `pnpm lint` — Passed across all TypeScript workspaces.
+- 2026-05-03 23:02 UTC — `pnpm typecheck` — Passed across all TypeScript workspaces.
+- 2026-05-03 23:02 UTC — `pnpm check:circular` — Passed; no circular dependencies found.

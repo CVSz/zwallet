@@ -28,9 +28,9 @@ This plan converts `docs/00_AGENT_CONTRACT.md` through `docs/11_FINAL_EXECUTION.
 
 ### 1.2 Workspace and strict TypeScript
 - [x] Validate `pnpm-workspace.yaml` includes all active workspaces.
-- [ ] Enforce strict TS in base tsconfig and service/app overrides.
-- [ ] Add/verify lint config and scripts for workspace-wide checks.
-- [ ] Detect/remove circular dependency chains.
+- [x] Enforce strict TS in base tsconfig and service/app overrides.
+- [x] Add/verify lint config and scripts for workspace-wide checks.
+- [x] Detect/remove circular dependency chains.
 
 ### 1.3 CI foundation
 - [ ] Add/verify GitHub Actions for lint/test/build matrix.
@@ -254,3 +254,5 @@ Release is complete only when all are true:
 - Re-verified required monorepo directory scaffold via shell assertions (`structure_ok`).
 - Re-confirmed workspace package globs in `pnpm-workspace.yaml` cover apps/services/packages and backend scopes.
 - Re-ran gateway tests at 16:15 UTC (`npm test` in `backend/services/gateway`): unit security tests passed; integration/e2e suites remained skipped by current Vitest configuration.
+
+- Re-ran workspace verification at 23:02 UTC: `pnpm lint`, `pnpm typecheck`, and `pnpm check:circular` all passed; madge reported no circular dependencies.
