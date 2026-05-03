@@ -1,9 +1,53 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import jwt from '@fastify/jwt';
+import helmet from '@fastify/helmet';
+import csrf from '@fastify/csrf-protection';
 import type Redis from 'ioredis';
 
+const JWT_ACCESS_TTL = '10m';
+const JWT_REFRESH_TTL = '7d';
+
 export async function securityPlugin(app: FastifyInstance) {
-  await app.register(jwt, { secret: process.env.JWT_SECRET ?? 'dev-secret' });
+  const jwtSecret = process.env.JWT_SECRET;
+  const refreshSecret = process.env.JWT_REFRESH_SECRET;
+
+  if (!jwtSecret || !refreshSecret) {
+    throw new Error('JWT secrets must be provided by secret manager (Vault)');
+  }
+
+  await app.register(helmet, {
+    contentSecurityPolicy: false,
+    crossOriginEmbedderPolicy: false,
+  });
+
+  await app.register(csrf, {
+    cookieOpts: { sameSite: 'strict', httpOnly: true, secure: process.env.NODE_ENV === 'production' },
+  });
+
+  await app.register(jwt, {
+    secret: jwtSecret,
+    sign: { expiresIn: JWT_ACCESS_TTL, issuer: 'zwallet-gateway', audience: 'zwallet-mobile' },
+  });
+
+  app.decorate('mintTokens', async function mintTokens(userId: string, deviceId: string) {
+    const accessToken = await app.jwt.sign({ sub: userId, deviceId, typ: 'access' });
+    const refreshToken = await app.jwt.sign({ sub: userId, deviceId, typ: 'refresh' }, { secret: refreshSecret, expiresIn: JWT_REFRESH_TTL });
+    return { accessToken, refreshToken };
+  });
+
+  app.decorate('rotateRefreshToken', async function rotateRefreshToken(refreshToken: string) {
+    const payload = await app.jwt.verify<{ sub: string; deviceId: string; typ: string }>(refreshToken, { secret: refreshSecret });
+    if (payload.typ !== 'refresh') {
+      throw new Error('Invalid token type');
+    }
+
+    if (app.revokedRefreshTokens.has(refreshToken)) {
+      throw new Error('Refresh token revoked');
+    }
+
+    app.revokedRefreshTokens.add(refreshToken);
+    return app.mintTokens(payload.sub, payload.deviceId);
+  });
 
   app.decorate('authenticate', async function (req: FastifyRequest, reply: FastifyReply) {
     try {
@@ -43,7 +87,10 @@ export async function securityPlugin(app: FastifyInstance) {
 declare module 'fastify' {
   interface FastifyInstance {
     replay: Set<string>;
+    revokedRefreshTokens: Set<string>;
     rateLimiter: Pick<Redis, 'incr' | 'expire'>;
     authenticate: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+    mintTokens: (userId: string, deviceId: string) => Promise<{ accessToken: string; refreshToken: string }>;
+    rotateRefreshToken: (refreshToken: string) => Promise<{ accessToken: string; refreshToken: string }>;
   }
 }

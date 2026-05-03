@@ -1,0 +1,3 @@
+-keep class com.zwallet.domain.model.** { *; }
+-keepclassmembers class * { @com.squareup.moshi.Json <fields>; }
+-dontwarn okhttp3.internal.platform.**

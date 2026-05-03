@@ -1,8 +1,8 @@
 package com.zwallet.core.security
 
+import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import android.content.Context
 
 class KeystoreManager(context: Context) {
     private val key = MasterKey.Builder(context).setKeyScheme(MasterKey.KeyScheme.AES256_GCM).build()
@@ -14,4 +14,7 @@ class KeystoreManager(context: Context) {
 
     fun saveMnemonic(mnemonic: String) = prefs.edit().putString("mnemonic", mnemonic).apply()
     fun loadMnemonic(): String? = prefs.getString("mnemonic", null)
+    fun saveRefreshToken(token: String) = prefs.edit().putString("refresh_token", token).apply()
+    fun loadRefreshToken(): String? = prefs.getString("refresh_token", null)
+    fun clearSecrets() = prefs.edit().clear().apply()
 }
