@@ -28,3 +28,10 @@ cd mobile
 npm install
 npm start
 ```
+## Requirements Documentation
+
+Project requirement documents are available in `docs/requirements/`:
+- `PRODUCT_REQUIREMENTS.md`
+- `NON_FUNCTIONAL_REQUIREMENTS.md`
+- `TECHNICAL_REQUIREMENTS.md`
+
