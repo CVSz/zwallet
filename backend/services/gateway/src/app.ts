@@ -5,6 +5,7 @@ import { PrismaClient } from '@prisma/client';
 import { lifecycleCreateSchema, loginSchema, priceSchema, registerSchema, swapRequestSchema, txIndexSchema, walletMetadataSchema } from './schemas/index.js';
 import { store } from './utils/store.js';
 import { securityPlugin } from './plugins/security.js';
+import { createHash } from 'node:crypto';
 
 type Deps = { rateLimiter?: { incr: (k: string) => Promise<number>; expire: (k: string, s: number) => Promise<number> }; cache?: { get: (k: string) => Promise<string | null>; setex: (k: string, s: number, v: string) => Promise<unknown> } };
 
@@ -98,7 +99,7 @@ export const buildApp = (deps: Deps = {}) => {
       return reply.code(502).send({ error: 'rpc_failure', txId, state });
     }
 
-    const txHash = crypto.createHash('sha256').update(`${txId}:${Date.now()}`).digest('hex');
+    const txHash = createHash('sha256').update(`${txId}:${Date.now()}`).digest('hex');
     state.steps = [...(state.steps as any[]), { step: 4, name: 'transaction_broadcast_to_chain', status: 'completed', txHash }];
 
     await fetch(`${indexerBase}/indexer/batch`, {
