@@ -59,6 +59,23 @@ jobs:
       - uses: actions/checkout@v4
       - name: Configure kubectl
         uses: azure/setup-kubectl@v4
+      - name: Configure kubeconfig
+        env:
+          KUBE_CONFIG: ${{ secrets.KUBE_CONFIG }}
+        run: |
+          if [ -z "$KUBE_CONFIG" ]; then
+            echo "KUBE_CONFIG secret is not set."
+            exit 1
+          fi
+          mkdir -p "$HOME/.kube"
+          if echo "$KUBE_CONFIG" | base64 --decode > "$HOME/.kube/config" 2>/dev/null; then
+            echo "Kubeconfig decoded from base64 secret."
+          else
+            echo "$KUBE_CONFIG" > "$HOME/.kube/config"
+            echo "Kubeconfig written as plaintext secret."
+          fi
+          chmod 600 "$HOME/.kube/config"
+          kubectl cluster-info
       - name: Deploy green
         run: |
           kubectl apply -f k8s/base
