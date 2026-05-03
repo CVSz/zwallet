@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import rateLimit from "@fastify/rate-limit";
 import { z } from "zod";
-import { IntentRouter } from "../../../services/router/src/intentRouter";
+import { IntentRouter } from "@zwallet/router";
 
 const app = Fastify({ logger: true });
 
