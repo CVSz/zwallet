@@ -12,9 +12,7 @@ class KeystoreManager(context: Context) {
         EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
     )
 
-    fun saveMnemonic(mnemonic: String) = prefs.edit().putString("mnemonic", mnemonic).apply()
-    fun loadMnemonic(): String? = prefs.getString("mnemonic", null)
-    fun saveRefreshToken(token: String) = prefs.edit().putString("refresh_token", token).apply()
-    fun loadRefreshToken(): String? = prefs.getString("refresh_token", null)
+    fun saveEncryptedSecret(secret: String) = prefs.edit().putString("wallet_secret", secret).apply()
+    fun loadEncryptedSecret(): String? = prefs.getString("wallet_secret", null)
     fun clearSecrets() = prefs.edit().clear().apply()
 }
