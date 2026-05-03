@@ -1,17 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeRedis, resetStore } from './helpers.js';
 
-vi.mock('../src/plugins/security.js', () => ({
-  securityPlugin: async (app: any) => {
-    app.decorate('authenticate', async (req: any) => { req.user = { sub: 'user-1' }; });
-    app.decorate('mintTokens', async () => ({ accessToken: 'token', refreshToken: 'refresh' }));
-    app.decorate('rotateRefreshToken', async () => ({ accessToken: 'token2', refreshToken: 'refresh2' }));
-  }
-}));
-
 import { buildApp } from '../src/app.js';
 
-describe.skip('e2e: create wallet, send transaction, swap token', () => {
+describe('e2e: create wallet, send transaction, swap token', () => {
   const originalFetch = global.fetch;
   beforeEach(() => {
     resetStore();
@@ -20,12 +12,15 @@ describe.skip('e2e: create wallet, send transaction, swap token', () => {
   afterEach(() => { vi.unstubAllGlobals(); global.fetch = originalFetch; });
 
   it('runs wallet -> transaction -> swap flow', async () => {
+    process.env.JWT_SECRET = 'test-secret';
     const app = buildApp({ rateLimiter: fakeRedis() as any, cache: fakeRedis() as any });
-    const wallet = await app.inject({ method: 'POST', url: '/v1/wallet-metadata', headers: { authorization: 'Bearer token' }, payload: { walletLabel: 'e2e', network: 'evm', address: '0xsender' } });
-    expect(wallet.statusCode).toBe(200);
-    const tx = await app.inject({ method: 'POST', url: '/v1/transactions/lifecycle', headers: { authorization: 'Bearer token' }, payload: { chain: 'evm', from: '0xsender', to: '0xreceiver', value: '10', signatureHex: 'abc123', privateKeyHex: 'def456' } });
+    await app.ready();
+    const token = await app.jwt.sign({ sub: 'user-1', deviceId: 'device-1', typ: 'access' });
+    const wallet = await app.inject({ method: 'POST', url: '/v1/wallet-metadata', headers: { authorization: `Bearer ${token}`, 'x-nonce': 'n1' }, payload: { walletLabel: 'e2e', network: 'evm', address: '0xsender' } });
+    expect(wallet.statusCode, wallet.body).toBe(200);
+    const tx = await app.inject({ method: 'POST', url: '/v1/transactions/lifecycle', headers: { authorization: `Bearer ${token}`, 'x-nonce': 'n2' }, payload: { chain: 'evm', from: '0xsender', to: '0xreceiver', value: '10', signatureHex: 'abcdef123456', privateKeyHex: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' } });
     expect(tx.statusCode).toBe(200);
-    const swap = await app.inject({ method: 'POST', url: '/v1/flow/wallet-sign-swap', headers: { authorization: 'Bearer token' }, payload: { chain: 'evm', fromToken: 'USDC', toToken: 'ETH', amount: '100', slippageBps: 50 } });
+    const swap = await app.inject({ method: 'POST', url: '/v1/flow/wallet-sign-swap', headers: { authorization: `Bearer ${token}`, 'x-nonce': 'n3' }, payload: { chain: 'ethereum', fromToken: 'USDC', toToken: 'ETH', amount: '100', slippageBps: 50 } });
     expect(swap.statusCode).toBe(200);
     await app.close();
   });
