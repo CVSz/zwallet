@@ -1,0 +1,19 @@
+{
+  "name": "@zwallet/indexer-service",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "lint": "echo lint-indexer-service"
+  },
+  "dependencies": {
+    "fastify": "^5.0.0",
+    "@zwallet/shared": "1.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3"
+  }
+}

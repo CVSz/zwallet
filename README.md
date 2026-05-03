@@ -10,6 +10,11 @@ This repository now contains a runnable **full-stack scaffold** aligned to `ARCH
   - `swap-service`
   - `policy-service`
   - `notify-service`
+
+- `indexer-service`
+  - multi-chain workers for EVM (Alchemy/Infura/self-node), Solana RPC, and Bitcoin node/API ingestion
+  - event-driven, idempotent batch jobs for balance tracking + transaction monitoring
+  - queue publisher abstraction for NATS/Kafka-backed WebSocket push updates
 - `mobile/` — React Native/Expo client (placeholder for Android-native migration path).
 - `infra/` — Docker Compose + K8s manifests.
 
