@@ -3,7 +3,7 @@ import cors from '@fastify/cors';
 import { Redis } from 'ioredis';
 import { cardFreezeSchema, cardIssueSchema, deviceBindSchema, issuerAuthWebhookSchema, kycStartSchema, lifecycleCreateSchema, loginSchema, priceSchema, refreshSchema, registerSchema, swapRequestSchema, txIndexSchema, walletMetadataSchema } from './schemas/index.js';
 import { securityPlugin } from './plugins/security.js';
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash, createHmac, timingSafeEqual, randomUUID } from 'node:crypto';
 import { RpcProviderPool } from './lib/rpc-provider-pool.js';
 import { InMemoryBundlerClient, UserOperationService } from './services/bundler.js';
 import { GatewayStateStore } from './services/state-store.js';
@@ -18,10 +18,10 @@ type Deps = { rateLimiter?: { incr: (k: string) => Promise<number>; expire: (k: 
 
 export const buildApp = (deps: Deps = {}) => {
   const app = Fastify({ logger: false });
-  const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', { lazyConnect: true });
+  const redis = deps.rateLimiter && deps.cache ? null : new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', { lazyConnect: true });
   const rateLimiter = deps.rateLimiter ?? (redis as any);
   const cache = deps.cache ?? (redis as any);
-  const state = new GatewayStateStore(redis as any);
+  const state = new GatewayStateStore((redis ?? deps.cache) as any);
   const rpcPool = new RpcProviderPool([{ id: 'rpc-a', call: async () => ({ price: Number((Math.random()*1000).toFixed(2)), block: 100 }) }, { id: 'rpc-b', call: async () => ({ price: Number((Math.random()*1000).toFixed(2)), block: 100 }) }, { id: 'rpc-c', call: async () => ({ price: Number((Math.random()*1000).toFixed(2)), block: 99 }) }], 2, { onQuorumDisagreement: (e) => app.log.warn({ event: 'rpc_quorum_disagreement', method: e.method }) });
   const mpcCfg = mpcConfigSchema.parse({ provider: process.env.MPC_PROVIDER ?? 'sandbox', timeoutMs: Number(process.env.MPC_TIMEOUT_MS ?? 500) });
   const mpcSigner = new MpcSignerService(new SandboxMpcProvider());
@@ -32,6 +32,11 @@ export const buildApp = (deps: Deps = {}) => {
   const kycService = new KycService(process.env.KYC_PROVIDER_BASE ?? 'http://kyc-provider.local', process.env.KYC_PROVIDER_KEY ?? 'local-dev-key');
 
   app.register(cors, { origin: true });
+  if (redis) {
+    app.addHook('onClose', async () => {
+      await redis.quit();
+    });
+  }
   app.decorate('replay', new Set<string>());
   app.decorate('rateLimiter', rateLimiter as any);
   app.register(securityPlugin);
@@ -71,6 +76,13 @@ export const buildApp = (deps: Deps = {}) => {
     const signature = req.headers['x-issuer-signature'];
     const nonce = req.headers['x-issuer-nonce'];
     if (!signature || !nonce) return reply.code(401).send({ error: 'missing_webhook_signature' });
+    const webhookSecret = process.env.ISSUER_WEBHOOK_SECRET ?? 'local-webhook-secret';
+    const payload = JSON.stringify(req.body ?? {});
+    const expected = createHmac('sha256', webhookSecret).update(`${String(nonce)}.${payload}`).digest('hex');
+    const provided = String(signature);
+    if (provided.length !== expected.length || !timingSafeEqual(Buffer.from(provided), Buffer.from(expected))) {
+      return reply.code(401).send({ error: 'invalid_webhook_signature' });
+    }
     const nonceKey = `issuer:webhook:nonce:${String(nonce)}`;
     const seen = await cache.get(nonceKey);
     if (seen) return reply.code(409).send({ error: 'replay_detected' });
