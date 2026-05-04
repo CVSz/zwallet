@@ -1,10 +1,17 @@
 #!/usr/bin/env node
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
+import { constants } from 'node:fs';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
 import process from 'node:process';
 
-const configPath = path.resolve(process.cwd(), 'scripts/installer.config.json');
+const DEFAULT_CONFIG = 'scripts/installer.config.json';
+
+function resolveConfigPath() {
+  const cliArg = process.argv.find((arg) => arg.startsWith('--config='));
+  const rawPath = cliArg ? cliArg.split('=')[1] : process.env.ZWALLET_INSTALLER_CONFIG ?? DEFAULT_CONFIG;
+  return path.resolve(process.cwd(), rawPath);
+}
 
 function run(command) {
   return new Promise((resolve, reject) => {
@@ -24,6 +31,9 @@ function assertNodeMajor(requiredMajor) {
   }
 }
 
+const configPath = resolveConfigPath();
+await access(configPath, constants.R_OK);
+
 const raw = await readFile(configPath, 'utf8');
 const config = JSON.parse(raw);
 
@@ -34,6 +44,8 @@ if (!Array.isArray(config.steps) || config.steps.length === 0) {
 if (config.node?.requiredMajor) {
   assertNodeMajor(config.node.requiredMajor);
 }
+
+console.log(`Using installer config: ${path.relative(process.cwd(), configPath)}`);
 
 for (const step of config.steps) {
   if (!step.command || !step.id) {
