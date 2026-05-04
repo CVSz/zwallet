@@ -109,7 +109,7 @@ Use the generated installer configuration to bootstrap and validate the workspac
 pnpm setup:auto
 ```
 
-Installer definitions live in `scripts/installer.config.json` and are executed by `scripts/run-installer.mjs`.
+Installer definitions live in `scripts/installer.config.json` and are executed by `scripts/run-installer.mjs`. Override the config path with `--config=<path>` or `ZWALLET_INSTALLER_CONFIG=<path>` for environment-specific bootstrap flows.
 
 ---
 
