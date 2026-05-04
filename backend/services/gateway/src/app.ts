@@ -1,13 +1,17 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import { Redis } from 'ioredis';
-import { deviceBindSchema, lifecycleCreateSchema, loginSchema, priceSchema, refreshSchema, registerSchema, swapRequestSchema, txIndexSchema, walletMetadataSchema } from './schemas/index.js';
+import { cardFreezeSchema, cardIssueSchema, deviceBindSchema, issuerAuthWebhookSchema, kycStartSchema, lifecycleCreateSchema, loginSchema, priceSchema, refreshSchema, registerSchema, swapRequestSchema, txIndexSchema, walletMetadataSchema } from './schemas/index.js';
 import { store } from './utils/store.js';
 import { securityPlugin } from './plugins/security.js';
 import { createHash, randomUUID } from 'node:crypto';
 import { RpcProviderPool } from './lib/rpc-provider-pool.js';
 import { InMemoryBundlerClient, UserOperationService } from './services/bundler.js';
 import { mpcConfigSchema, MpcSignerService, SandboxMpcProvider } from './services/mpc.js';
+import { RiskEngine } from './services/risk/risk-engine.js';
+import { OfframpService } from './services/liquidity/offramp-service.js';
+import { CardOrchestrator } from './services/card/card-orchestrator.js';
+import { KycService } from './services/compliance/kyc-service.js';
 
 type Deps = { rateLimiter?: { incr: (k: string) => Promise<number>; expire: (k: string, s: number) => Promise<number> }; cache?: { get: (k: string) => Promise<string | null>; setex: (k: string, s: number, v: string) => Promise<unknown> } };
 
@@ -20,6 +24,10 @@ export const buildApp = (deps: Deps = {}) => {
   const mpcCfg = mpcConfigSchema.parse({ provider: process.env.MPC_PROVIDER ?? 'sandbox', timeoutMs: Number(process.env.MPC_TIMEOUT_MS ?? 500) });
   const mpcSigner = new MpcSignerService(new SandboxMpcProvider());
   const userOpService = new UserOperationService(new InMemoryBundlerClient());
+  const riskEngine = new RiskEngine();
+  const offrampService = new OfframpService((process.env.RFQ_ENDPOINTS ?? '').split(',').filter(Boolean), { credit: async () => undefined });
+  const cardOrchestrator = new CardOrchestrator(process.env.ISSUER_BASE ?? 'http://issuer.local', process.env.ISSUER_KEY ?? 'local-dev-key', riskEngine, offrampService);
+  const kycService = new KycService(process.env.KYC_PROVIDER_BASE ?? 'http://kyc-provider.local', process.env.KYC_PROVIDER_KEY ?? 'local-dev-key');
 
   app.register(cors, { origin: true });
   app.decorate('replay', store.replayTokens);
@@ -42,6 +50,40 @@ export const buildApp = (deps: Deps = {}) => {
   app.post('/v1/swaps/orchestrate', { preHandler: [authGuard] }, async (req: any, reply) => { const parsed = swapRequestSchema.safeParse(req.body); if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() }); const swap = { id: randomUUID(), ...parsed.data, status: 'quoted' }; store.swaps.push(swap); store.audit.push({ action: 'swap.orchestrate', userId: req.user.sub, payload: swap }); return swap; });
   app.get('/v1/prices/:symbol', { preHandler: [authGuard] }, async (req: any, reply) => { const parsed = priceSchema.safeParse(req.params); if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() }); const cacheKey = `price:${parsed.data.symbol}`; const hit = await cache.get(cacheKey); if (hit) return { symbol: parsed.data.symbol, price: Number(hit), source: 'cache' }; const quorumPrice = await rpcPool.call('eth_getBalance', [parsed.data.symbol]) as { price: number }; const price = Number(quorumPrice.price.toFixed(2)); await cache.setex(cacheKey, 15, String(price)); store.audit.push({ action: 'price.read', userId: req.user.sub, payload: { symbol: parsed.data.symbol, price } }); return { symbol: parsed.data.symbol, price, source: 'oracle' }; });
   app.get('/v1/audit-logs', { preHandler: [authGuard] }, async () => ({ items: store.audit }));
+
+  app.post('/v1/compliance/kyc/start', { preHandler: [authGuard] }, async (req: any, reply) => {
+    const parsed = kycStartSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (parsed.data.userId !== req.user.sub) return reply.code(403).send({ error: 'user_mismatch' });
+    return kycService.start(parsed.data);
+  });
+
+  app.post('/v1/card/issue', { preHandler: [authGuard] }, async (req: any, reply) => {
+    const parsed = cardIssueSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    if (parsed.data.userId !== req.user.sub) return reply.code(403).send({ error: 'user_mismatch' });
+    return cardOrchestrator.issueCard(parsed.data);
+  });
+
+  app.post('/v1/webhooks/issuer/auth', async (req: any, reply) => {
+    const signature = req.headers['x-issuer-signature'];
+    const nonce = req.headers['x-issuer-nonce'];
+    if (!signature || !nonce) return reply.code(401).send({ error: 'missing_webhook_signature' });
+    const nonceKey = `issuer:webhook:nonce:${String(nonce)}`;
+    const seen = await cache.get(nonceKey);
+    if (seen) return reply.code(409).send({ error: 'replay_detected' });
+    await cache.setex(nonceKey, 300, '1');
+    const parsed = issuerAuthWebhookSchema.safeParse(req.body);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    return cardOrchestrator.handleAuth(parsed.data);
+  });
+
+  app.post('/v1/card/:id/freeze', { preHandler: [authGuard] }, async (req: any, reply) => {
+    const parsed = cardFreezeSchema.safeParse(req.params);
+    if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() });
+    await cardOrchestrator.freeze(parsed.data.id);
+    return { ok: true };
+  });
 
   app.post('/v1/transactions/lifecycle', { preHandler: [authGuard] }, async (req: any, reply) => {
     const parsed = lifecycleCreateSchema.safeParse(req.body);
