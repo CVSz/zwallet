@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import rateLimit from "@fastify/rate-limit";
 import { z } from "zod";
 import { IntentRouter } from "@zwallet/router";
+import { createWorldcoinReposRoute } from "./worldcoinRepos.js";
 
 const app = Fastify({ logger: true });
 
@@ -14,6 +15,8 @@ const router = new IntentRouter([
   "https://solver-1.internal",
   "https://solver-2.internal",
 ]);
+
+createWorldcoinReposRoute(app);
 
 app.post("/swap/quote", async (req, reply) => {
   const bodySchema = z.object({
