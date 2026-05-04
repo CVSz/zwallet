@@ -1,0 +1,13 @@
+flows:
+  feature:
+    - analyze architecture
+    - generate domain layer
+    - generate application layer
+    - generate infra layer
+    - add tests
+    - add security checks
+
+  refactor:
+    - detect anti-patterns
+    - enforce clean architecture
+    - optimize performance
