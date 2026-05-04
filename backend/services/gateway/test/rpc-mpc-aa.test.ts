@@ -12,6 +12,19 @@ describe('rpc pool', () => {
     const pool = new RpcProviderPool([{ id: 'a', call: async () => 1 }, { id: 'b', call: async () => 2 }, { id: 'c', call: async () => 3 }], 2);
     await expect(pool.call('eth_getBalance')).rejects.toThrow('quorum_not_reached');
   });
+
+  it('runs critical quorum checks in parallel across providers', async () => {
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+    const pool = new RpcProviderPool([
+      { id: 'a', call: async () => { await delay(120); return 42; } },
+      { id: 'b', call: async () => { await delay(120); return 42; } },
+      { id: 'c', call: async () => { await delay(120); return 7; } }
+    ], 2);
+
+    const started = Date.now();
+    await expect(pool.call('eth_getBalance')).resolves.toBe(42);
+    expect(Date.now() - started).toBeLessThan(220);
+  });
 });
 
 describe('mpc + aa endpoints', () => {
