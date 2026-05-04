@@ -7,6 +7,7 @@ from slowapi.util import get_remote_address
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.application.ai import FeaturePipeline, FeatureVector, IntelligenceService, VectorStore
+from app.middleware.security_distributed import DistributedSecurityMiddleware
 from app.application.schemas import (
     BehaviorEventDTO,
     InferenceResponse,
@@ -40,7 +41,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="ZWallet API", version="1.0.0", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
-
+app.add_middleware(DistributedSecurityMiddleware)
 
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(_, exc):
