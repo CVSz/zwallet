@@ -1,0 +1,25 @@
+{
+  "name": "zwallet-bootstrap",
+  "packageManager": "pnpm",
+  "node": {
+    "requiredMajor": 22
+  },
+  "steps": [
+    {
+      "id": "enable-corepack",
+      "command": "corepack enable"
+    },
+    {
+      "id": "install-deps",
+      "command": "pnpm install --frozen-lockfile"
+    },
+    {
+      "id": "validate-typecheck",
+      "command": "pnpm typecheck"
+    },
+    {
+      "id": "validate-lint",
+      "command": "pnpm lint"
+    }
+  ]
+}
