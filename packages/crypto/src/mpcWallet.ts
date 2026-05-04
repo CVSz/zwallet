@@ -30,15 +30,17 @@ export class MPCWallet {
     }
 
     const selected = Array.from(this.shares.values()).slice(0, this.threshold);
-    const baseLength = selected[0].length;
+    const first = selected[0];
+    if (!first) throw new Error("Insufficient shares");
+    const baseLength = first.length;
 
     return selected.slice(1).reduce((acc, cur) => {
       const out = Buffer.alloc(baseLength);
       for (let i = 0; i < baseLength; i += 1) {
-        out[i] = acc[i] ^ cur[i % cur.length];
+        out[i] = (acc[i] ?? 0) ^ (cur[i % cur.length] ?? 0);
       }
       return out;
-    }, Buffer.from(selected[0]));
+    }, Buffer.from(first));
   }
 
   sign(payload: Buffer): Buffer {
