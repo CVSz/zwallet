@@ -6,7 +6,8 @@
     "typecheck": "pnpm -r run typecheck",
     "lint": "pnpm -r run lint",
     "check:circular": "madge --circular --extensions ts apps/api/src services/wallet-engine/src services/swap-engine/src services/indexer/src packages/crypto-core/src packages/chain-adapters/src packages/shared-types/src",
-    "setup:auto": "node scripts/run-installer.mjs"
+    "setup:auto": "node scripts/run-installer.mjs",
+    "generate:releases": "node scripts/generate-releases.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.26.0",
