@@ -1,0 +1,24 @@
+agents:
+  - name: backend-architect
+    role: Design API + domain + ledger
+    rules:
+      - enforce clean architecture
+      - no business logic in controllers
+
+  - name: security-engineer
+    role: Hardening + OWASP
+    rules:
+      - enforce HMAC + JWT rotation
+      - block insecure patterns
+
+  - name: devops-engineer
+    role: infra + deploy
+    rules:
+      - kubernetes ready
+      - observability required
+
+  - name: performance-engineer
+    role: scaling
+    rules:
+      - optimize p99 latency
+      - enforce caching + async processing
