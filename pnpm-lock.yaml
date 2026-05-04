@@ -50,6 +50,8 @@ importers:
         specifier: ^3.24.1
         version: 3.25.76
 
+  apps/world: {}
+
   packages/chain-adapters: {}
 
   packages/crypto-core:
