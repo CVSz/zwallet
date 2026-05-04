@@ -50,3 +50,24 @@ export const deviceBindSchema = z.object({
   userId: z.string().uuid(),
   deviceId: z.string().min(8)
 });
+
+export const cardIssueSchema = z.object({
+  userId: z.string().uuid(),
+  kycLevel: z.enum(['none', 'basic', 'full']),
+  type: z.enum(['virtual', 'physical']),
+  currency: z.enum(['USD', 'EUR', 'THB'])
+});
+
+export const cardFreezeSchema = z.object({ id: z.string().min(6) });
+
+export const issuerAuthWebhookSchema = z.object({
+  userId: z.string().uuid(),
+  cardId: z.string().min(6),
+  amount: z.number().positive(),
+  currency: z.string().min(3).max(3),
+  mcc: z.string().min(3),
+  merchant: z.string().min(2),
+  authId: z.string().min(6)
+});
+
+export const kycStartSchema = z.object({ userId: z.string().uuid(), country: z.string().min(2).max(2) });
