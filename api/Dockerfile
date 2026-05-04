@@ -1,5 +1,4 @@
-# api/Dockerfile.optimized
-# Multi-stage, minimal, non-root, production hardened
+# api/Dockerfile
 
 ########################
 # Builder stage
@@ -18,9 +17,14 @@ RUN apt-get update \
 
 COPY requirements.txt .
 
+# create isolated venv + enforce hash
 RUN python -m venv /venv \
  && /venv/bin/pip install --upgrade pip \
- && /venv/bin/pip install -r requirements.txt
+ && /venv/bin/pip install --require-hashes -r requirements.txt \
+ && find /venv -name "*.pyc" -delete \
+ && rm -rf /venv/lib/python*/site-packages/pip* \
+           /venv/lib/python*/site-packages/setuptools* \
+           /venv/lib/python*/site-packages/wheel*
 
 ########################
 # Runtime stage
@@ -33,23 +37,30 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Create non-root user
-RUN useradd -m -u 10001 appuser
+# non-root + no shell
+RUN useradd -m -u 10001 -s /usr/sbin/nologin appuser
 
-# Copy only virtualenv (no build deps)
 COPY --from=builder /venv /venv
-
-# Copy app source
 COPY app ./app
 
-# Fix ownership
-RUN chown -R appuser:appuser /app
+# strict permissions
+RUN chown -R appuser:appuser /app /venv \
+ && chmod -R 550 /app \
+ && chmod -R 550 /venv
+
 USER appuser
 
 EXPOSE 8080
 
-# Healthcheck (lightweight TCP)
+# hardened healthcheck (no DNS, no shell)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
-  CMD python -c "import socket; s=socket.socket(); s.settimeout(2); s.connect(('127.0.0.1',8080)); s.close()" || exit 1
+  CMD python -c "import socket; s=socket.create_connection(('127.0.0.1',8080),2); s.close()" || exit 1
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--proxy-headers", "--forwarded-allow-ips", "*"]
+CMD [
+  "uvicorn",
+  "app.main:app",
+  "--host","0.0.0.0",
+  "--port","8080",
+  "--proxy-headers",
+  "--forwarded-allow-ips","127.0.0.1"
+]
