@@ -93,33 +93,70 @@ importers:
         specifier: ^2.2.4
         version: 2.2.4
 
+  packages/rpc: {}
+
   packages/shared-types:
     dependencies:
       zod:
         specifier: ^3.23.8
         version: 3.25.76
 
+  services/card:
+    dependencies:
+      '@zwallet/rpc':
+        specifier: workspace:*
+        version: link:../../packages/rpc
+
+  services/compliance:
+    dependencies:
+      '@zwallet/rpc':
+        specifier: workspace:*
+        version: link:../../packages/rpc
+
   services/event-workers:
     dependencies:
       '@zwallet/events':
         specifier: workspace:*
         version: link:../../packages/events
+      '@zwallet/rpc':
+        specifier: workspace:*
+        version: link:../../packages/rpc
       '@zwallet/swap-engine':
         specifier: workspace:*
         version: link:../swap-engine
 
-  services/indexer: {}
+  services/indexer:
+    dependencies:
+      '@zwallet/rpc':
+        specifier: workspace:*
+        version: link:../../packages/rpc
+
+  services/liquidity:
+    dependencies:
+      '@zwallet/rpc':
+        specifier: workspace:*
+        version: link:../../packages/rpc
 
   services/router:
     dependencies:
+      '@zwallet/rpc':
+        specifier: workspace:*
+        version: link:../../packages/rpc
       zod:
         specifier: ^3.24.1
         version: 3.25.76
 
-  services/swap-engine: {}
+  services/swap-engine:
+    dependencies:
+      '@zwallet/rpc':
+        specifier: workspace:*
+        version: link:../../packages/rpc
 
   services/wallet-engine:
     dependencies:
+      '@zwallet/rpc':
+        specifier: workspace:*
+        version: link:../../packages/rpc
       '@zwallet/shared-types':
         specifier: workspace:*
         version: link:../../packages/shared-types
