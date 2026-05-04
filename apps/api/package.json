@@ -15,6 +15,7 @@
     "@zwallet/router": "workspace:*",
     "fastify": "^5.2.1",
     "@fastify/rate-limit": "^10.3.0",
-    "zod": "^3.24.1"
+    "zod": "^3.24.1",
+    "@zwallet/events": "workspace:*"
   }
 }
