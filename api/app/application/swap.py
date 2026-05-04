@@ -18,27 +18,38 @@ class RouteQuote:
 
 class SwapOrchestrator:
     PROVIDERS = ("1inch", "jupiter")
+    MAX_SLIPPAGE_BPS = 5_000
+    GAS_TOKEN_PRICE = 0.000001
 
     def fetch_quotes(self, from_token: str, to_token: str, amount: float, slippage_bps: int) -> list[RouteQuote]:
+        if amount <= 0:
+            raise ValueError("amount_must_be_positive")
+        if slippage_bps < 0 or slippage_bps > self.MAX_SLIPPAGE_BPS:
+            raise ValueError("slippage_out_of_bounds")
         # deterministic quote curve used until provider adapters are wired.
         quotes: list[RouteQuote] = []
         for provider in self.PROVIDERS:
             base_out = amount * (0.998 if provider == "1inch" else 0.997)
             fee_penalty = 1 - (slippage_bps / 100_000)
             expected_out = round(base_out * fee_penalty, 8)
-            route = [from_token, "USDC", to_token] if amount > 1000 else [from_token, to_token]
-            gas = 140_000 if len(route) == 3 else 90_000
-            score = expected_out - (gas * 0.000001)
-            quotes.append(
-                RouteQuote(
-                    route_id=f"{provider}:{from_token}:{to_token}:{int(amount)}",
-                    provider=provider,
-                    route=route,
-                    expected_out=expected_out,
-                    estimated_gas=gas,
-                    score=score,
+            route_options = (
+                [from_token, to_token],
+                [from_token, "USDC", to_token],
+            ) if amount > 1000 else ([from_token, to_token],)
+
+            for route in route_options:
+                gas = 140_000 if len(route) == 3 else 90_000
+                score = expected_out - (gas * self.GAS_TOKEN_PRICE)
+                quotes.append(
+                    RouteQuote(
+                        route_id=f"{provider}:{'-'.join(route)}:{int(amount)}",
+                        provider=provider,
+                        route=route,
+                        expected_out=expected_out,
+                        estimated_gas=gas,
+                        score=score,
+                    )
                 )
-            )
         return quotes
 
     def normalize_routes(self, quotes: list[RouteQuote]) -> list[RouteQuote]:
