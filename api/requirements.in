@@ -5,6 +5,7 @@ fastapi
 uvicorn[standard]
 pydantic
 pydantic-settings
+aioredis
 
 # Database
 psycopg[binary]

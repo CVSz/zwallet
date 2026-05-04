@@ -4,6 +4,10 @@
 #
 #    pip-compile --generate-hashes --output-file=api/requirements.txt api/requirements.in
 #
+aioredis==2.0.1 \
+    --hash=sha256:9ac0d0b3b485d293b8ca1987e6de8658d7dafcca1cddfcd1d506cae8cdebfdd6 \
+    --hash=sha256:eaa51aaf993f2d71f54b70527c440437ba65340588afeb786cd87c55c89cd98e
+    # via -r api/requirements.in
 alembic==1.13.1 \
     --hash=sha256:2edcc97bed0bd3272611ce3a98d98279e9c209e7186e43e75bbb1b2bdfdbcc43 \
     --hash=sha256:4932c8558bf68f2ee92b9bbcb8218671c627064d5b08939437af6d77dc05e595
@@ -23,6 +27,10 @@ anyio==4.13.0 \
     #   httpx
     #   starlette
     #   watchfiles
+async-timeout==5.0.1 \
+    --hash=sha256:39e3809566ff85354557ec2398b55e096c8364bacac9405a7a1fa429e77fe76c \
+    --hash=sha256:d9321a7a3d5a6a5e187e824d2fa0793ce379a202935782d555d6e9d2735677d3
+    # via aioredis
 certifi==2026.4.22 \
     --hash=sha256:3cb2210c8f88ba2318d29b0388d1023c8492ff72ecdde4ebdaddbb13a31b1c4a \
     --hash=sha256:8d455352a37b71bf76a79caa83a3d6c25afee4a385d632127b6afb3963f1c580
@@ -870,6 +878,7 @@ typing-extensions==4.15.0 \
     --hash=sha256:0cea48d173cc12fa28ecabc3b837ea3cf6f38c6d1136f85cbaaf598984861466 \
     --hash=sha256:f0fa19c6845758ab08074a0cfa8b7aecb71c999ca73d62883bc25cc018c4e548
     # via
+    #   aioredis
     #   alembic
     #   anyio
     #   fastapi
