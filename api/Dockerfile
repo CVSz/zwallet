@@ -1,4 +1,5 @@
 # api/Dockerfile
+# FINAL HARDENED (zero-trust + minimal attack surface)
 
 ########################
 # Builder stage
@@ -17,7 +18,6 @@ RUN apt-get update \
 
 COPY requirements.txt .
 
-# create isolated venv + enforce hash
 RUN python -m venv /venv \
  && /venv/bin/pip install --upgrade pip \
  && /venv/bin/pip install --require-hashes -r requirements.txt \
@@ -37,7 +37,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# non-root + no shell
+# non-root (no shell)
 RUN useradd -m -u 10001 -s /usr/sbin/nologin appuser
 
 COPY --from=builder /venv /venv
@@ -52,7 +52,6 @@ USER appuser
 
 EXPOSE 8080
 
-# hardened healthcheck (no DNS, no shell)
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD python -c "import socket; s=socket.create_connection(('127.0.0.1',8080),2); s.close()" || exit 1
 
