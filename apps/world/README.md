@@ -16,6 +16,13 @@ pnpm --filter @zwallet/world start
 
 Then open `http://localhost:4173/apps/world/index.html`.
 
+## Build
+```bash
+pnpm --filter @zwallet/world build
+```
+
+The static build output is generated in `apps/world/dist`.
+
 ## Checks
 ```bash
 pnpm --filter @zwallet/world check
