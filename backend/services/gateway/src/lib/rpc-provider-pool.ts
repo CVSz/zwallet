@@ -36,19 +36,25 @@ export class RpcProviderPool {
     if (!active.length) throw new Error('rpc_pool_unavailable');
 
     if (cls === 'critical') {
-      const results: unknown[] = [];
-      for (const p of active) {
+      const settled = await Promise.allSettled(active.map(async (p) => {
         const started = Date.now();
         try {
-          const r = await this.retry(() => p.call(method, params));
+          const value = await this.retry(() => p.call(method, params));
           this.metrics.onCall?.({ providerId: p.id, method, latencyMs: Date.now() - started, ok: true, breaker: this.health.get(p.id)!.state });
           this.markResult(p.id, true);
-          results.push(r);
+          return { ok: true as const, value };
         } catch {
           this.metrics.onCall?.({ providerId: p.id, method, latencyMs: Date.now() - started, ok: false, breaker: this.health.get(p.id)!.state });
           this.markResult(p.id, false);
+          return { ok: false as const };
         }
+      }));
+
+      const results: unknown[] = [];
+      for (const entry of settled) {
+        if (entry.status === 'fulfilled' && entry.value.ok) results.push(entry.value.value);
       }
+
       const groups = new Map<string, { value: unknown; count: number }>();
       for (const r of results) {
         const k = JSON.stringify(r);
