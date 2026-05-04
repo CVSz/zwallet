@@ -5,6 +5,9 @@ import { deviceBindSchema, lifecycleCreateSchema, loginSchema, priceSchema, refr
 import { store } from './utils/store.js';
 import { securityPlugin } from './plugins/security.js';
 import { createHash, randomUUID } from 'node:crypto';
+import { RpcProviderPool } from './lib/rpc-provider-pool.js';
+import { InMemoryBundlerClient, UserOperationService } from './services/bundler.js';
+import { mpcConfigSchema, MpcSignerService, SandboxMpcProvider } from './services/mpc.js';
 
 type Deps = { rateLimiter?: { incr: (k: string) => Promise<number>; expire: (k: string, s: number) => Promise<number> }; cache?: { get: (k: string) => Promise<string | null>; setex: (k: string, s: number, v: string) => Promise<unknown> } };
 
@@ -13,6 +16,10 @@ export const buildApp = (deps: Deps = {}) => {
   const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379', { lazyConnect: true });
   const rateLimiter = deps.rateLimiter ?? (redis as any);
   const cache = deps.cache ?? (redis as any);
+  const rpcPool = new RpcProviderPool([{ id: 'rpc-a', call: async () => ({ price: Number((Math.random()*1000).toFixed(2)), block: 100 }) }, { id: 'rpc-b', call: async () => ({ price: Number((Math.random()*1000).toFixed(2)), block: 100 }) }, { id: 'rpc-c', call: async () => ({ price: Number((Math.random()*1000).toFixed(2)), block: 99 }) }], 2, { onQuorumDisagreement: (e) => app.log.warn({ event: 'rpc_quorum_disagreement', method: e.method }) });
+  const mpcCfg = mpcConfigSchema.parse({ provider: process.env.MPC_PROVIDER ?? 'sandbox', timeoutMs: Number(process.env.MPC_TIMEOUT_MS ?? 500) });
+  const mpcSigner = new MpcSignerService(new SandboxMpcProvider());
+  const userOpService = new UserOperationService(new InMemoryBundlerClient());
 
   app.register(cors, { origin: true });
   app.decorate('replay', store.replayTokens);
@@ -33,7 +40,7 @@ export const buildApp = (deps: Deps = {}) => {
   app.post('/v1/wallet-metadata', { preHandler: [authGuard] }, async (req: any, reply) => { const parsed = walletMetadataSchema.safeParse(req.body); if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() }); const item = { id: randomUUID(), userId: req.user.sub, ...parsed.data }; store.wallets.push(item); store.audit.push({ action: 'wallet.create', userId: req.user.sub, payload: item }); return item; });
   app.post('/v1/transactions/index', { preHandler: [authGuard] }, async (req: any, reply) => { const parsed = txIndexSchema.safeParse(req.body); if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() }); const entry = { ...parsed.data, indexedAt: new Date().toISOString() }; store.txIndex.push(entry); store.audit.push({ action: 'tx.index', userId: req.user.sub, payload: entry }); return { indexed: true, entry }; });
   app.post('/v1/swaps/orchestrate', { preHandler: [authGuard] }, async (req: any, reply) => { const parsed = swapRequestSchema.safeParse(req.body); if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() }); const swap = { id: randomUUID(), ...parsed.data, status: 'quoted' }; store.swaps.push(swap); store.audit.push({ action: 'swap.orchestrate', userId: req.user.sub, payload: swap }); return swap; });
-  app.get('/v1/prices/:symbol', { preHandler: [authGuard] }, async (req: any, reply) => { const parsed = priceSchema.safeParse(req.params); if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() }); const cacheKey = `price:${parsed.data.symbol}`; const hit = await cache.get(cacheKey); if (hit) return { symbol: parsed.data.symbol, price: Number(hit), source: 'cache' }; const price = Number((Math.random() * 1000).toFixed(2)); await cache.setex(cacheKey, 15, String(price)); store.audit.push({ action: 'price.read', userId: req.user.sub, payload: { symbol: parsed.data.symbol, price } }); return { symbol: parsed.data.symbol, price, source: 'oracle' }; });
+  app.get('/v1/prices/:symbol', { preHandler: [authGuard] }, async (req: any, reply) => { const parsed = priceSchema.safeParse(req.params); if (!parsed.success) return reply.code(400).send({ error: parsed.error.flatten() }); const cacheKey = `price:${parsed.data.symbol}`; const hit = await cache.get(cacheKey); if (hit) return { symbol: parsed.data.symbol, price: Number(hit), source: 'cache' }; const quorumPrice = await rpcPool.call('eth_getBalance', [parsed.data.symbol]) as { price: number }; const price = Number(quorumPrice.price.toFixed(2)); await cache.setex(cacheKey, 15, String(price)); store.audit.push({ action: 'price.read', userId: req.user.sub, payload: { symbol: parsed.data.symbol, price } }); return { symbol: parsed.data.symbol, price, source: 'oracle' }; });
   app.get('/v1/audit-logs', { preHandler: [authGuard] }, async () => ({ items: store.audit }));
 
   app.post('/v1/transactions/lifecycle', { preHandler: [authGuard] }, async (req: any, reply) => {
@@ -121,6 +128,27 @@ export const buildApp = (deps: Deps = {}) => {
     const tx = store.lifecycleTx.get(req.params.txId);
     if (!tx) return reply.code(404).send({ error: 'not_found' });
     return { txId: req.params.txId, state: tx };
+  });
+
+
+  app.post('/v1/mpc/sign-transaction', { preHandler: [authGuard] }, async (req: any, reply) => {
+    const body = req.body as Record<string, unknown>;
+    if (!body?.walletId || typeof body.walletId !== 'string') return reply.code(400).send({ error: 'invalid_wallet_id' });
+    try {
+      const signed = await mpcSigner.signTransaction(body.walletId, body);
+      return { provider: mpcCfg.provider, signature: signed.signature };
+    } catch (e: any) {
+      if (e?.message === 'policy_denied') return reply.code(403).send({ error: 'policy_denied' });
+      return reply.code(503).send({ error: 'provider_unavailable' });
+    }
+  });
+
+  app.post('/v1/aa/user-operations', { preHandler: [authGuard] }, async (req: any, reply) => {
+    try { return await userOpService.createAndSubmit(req.body); } catch (e: any) { return reply.code(400).send({ error: e?.message ?? 'invalid_user_operation' }); }
+  });
+
+  app.get('/v1/aa/user-operations/:userOpHash/status', { preHandler: [authGuard] }, async (req: any) => {
+    return { userOpHash: req.params.userOpHash, status: await userOpService.status(req.params.userOpHash) };
   });
 
   app.post('/v1/flow/wallet-sign-swap', { preHandler: [authGuard] }, async (req: any, reply) => {
