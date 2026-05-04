@@ -1,0 +1,28 @@
+# api/requirements.txt
+# Pinned, deterministic, security-aware dependencies
+
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+pydantic==2.7.4
+pydantic-settings==2.3.4
+
+# Database
+psycopg2-binary==2.9.9
+SQLAlchemy==2.0.30
+alembic==1.13.1
+
+# Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# HTTP / Async
+httpx==0.27.0
+
+# Observability
+structlog==24.1.0
+prometheus-client==0.20.0
+
+# Utils
+python-dotenv==1.0.1
+
+# Strict reproducibility (recommended to convert later to --require-hashes)
