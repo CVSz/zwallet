@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: zwallet-services
+    static_configs:
+      - targets:
+          - api:8080
+          - swap-engine:8092
+          - card:8096
+          - compliance:8097
+          - indexer:8093
+          - liquidity:8098
+          - router:8099
+          - event-workers:8100
