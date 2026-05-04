@@ -1,96 +1,211 @@
-# AGENTS.md — zWallet Codex Meta Master (Final Release)
+# AGENTS.md — zWallet Autonomous Engineering Protocol (v2 - Production)
 
 ## 0) Mission
-Deliver production-ready changes to zWallet using a strict multi-role execution system that prioritizes correctness, security, reproducibility, and testability.
+Deliver production-grade, secure, scalable crypto + payment infrastructure.
 
-Codex must act as a complete engineering control plane for every task:
-- **Architect** (design)
-- **Builder** (implementation)
-- **Auditor** (security + quality review)
-- **Tester** (verification)
-
-All four roles are mandatory before final output.
+System scope includes:
+- Non-custodial wallet (MPC / AA)
+- Swap engine (DEX + RFQ)
+- Card + fiat rails
+- Distributed backend services
 
 ---
 
-## 1) Execution Contract (Mandatory Loop)
-For every user request, run this loop explicitly and internally:
+## 1) Execution Contract (MANDATORY LOOP)
 
-1. **Analyze** — restate goal, constraints, impacted scope.
-2. **Plan** — create ordered implementation + validation steps.
-3. **Implement** — perform minimal, correct, scoped edits.
-4. **Validate** — static sanity checks, imports, interfaces, config consistency.
-5. **Test** — run relevant unit/integration/e2e checks.
-6. **Fix** — address failures and re-run validation/tests.
-7. **Output** — summarize changes, risks, and proof of verification.
+Analyze → Plan → Implement → Validate → Test → Fix → Output
 
-Do not skip steps unless impossible in environment; if blocked, state exact blocker and fallback checks.
-
-Execution loop order is mandatory for every task: Analyze → Plan → Implement → Validate → Test → Fix → Output.
+Additional enforcement:
+- All blockchain operations must be simulated before execution
+- All financial operations must be idempotent
 
 ---
 
 ## 2) Non-Negotiable Rules
-- No placeholders, TODO stubs, fake mocks, or pseudocode in shipped paths.
-- No broken imports, unresolved symbols, or dead references.
-- Changes must compile/build for impacted packages.
-- Relevant tests must pass for impacted scope.
-- Keep diffs minimal and targeted (avoid unrelated churn).
-- All edits must be diff-aware: read existing files/state before writing changes.
-- Preserve backward compatibility unless task explicitly allows breaking changes.
+
+- No TODO / placeholder / pseudo
+- No broken builds
+- No unsafe crypto usage
+- No direct trust in external RPC/API
+- Diff must be minimal and scoped
 
 ---
 
-## 3) Repository Structure Authority
-Primary top-level scope:
-- `/apps`
-- `/services`
-- `/packages`
-- `/infra`
+## 3) Architecture Authority
 
-When adding code, place it in the correct layer:
-- **apps**: clients/frontends
-- **services**: APIs, workers, backend processes
-- **packages**: shared libs/types/utils
-- **infra**: deployment, compose, IaC, ops scripts
+Layers:
+- `/apps` → Android / UI
+- `/services` → APIs, workers
+- `/packages` → crypto, shared logic
+- `/infra` → deployment
 
----
-
-## 4) Security Guardrails (Hard Requirements)
-- Private keys **must never** leave client-side trust boundary.
-- Never log secrets, private keys, mnemonics, auth tokens, or raw signing payloads.
-- Validate all external inputs (API, RPC, query/body, env-derived config).
-- Enforce least-privilege defaults in configs and service accounts.
-- Add/maintain dependency and transport hygiene (TLS, signature checks where relevant).
+Strict separation:
+- Signing → client or MPC only
+- Backend → orchestration only
 
 ---
 
-## 5) Quality Gate Checklist
-Before concluding, verify:
-- Lint/format consistency for touched files.
-- Build/compile for affected modules.
-- Tests for changed behavior (unit minimum; integration/e2e when applicable).
-- Require explicit command + result evidence for each completed task.
-- Error handling paths and edge cases.
-- No secrets added in code, logs, fixtures, or docs.
-- Developer ergonomics preserved (clear scripts/docs).
+## 4) WALLET + CRYPTO RULES (CRITICAL)
+
+- Private keys:
+  - NEVER leave client or MPC boundary
+  - MUST be encrypted at rest (AES-256-GCM or stronger)
+
+- Signing:
+  - MUST be deterministic
+  - MUST verify chain ID + nonce
+
+- Memory:
+  - Wipe sensitive buffers after use
+
+- Preferred:
+  - MPC / threshold signing
+  - Account abstraction (ERC-4337)
 
 ---
 
-## 6) Definition of Success
-A task is considered complete only when:
-1. `docker-compose up` is functional for intended stack.
-2. E2E path(s) relevant to the change pass.
-3. Security constraints above remain intact.
-4. Final output includes what changed and what was verified.
+## 5) TRANSACTION PIPELINE (MANDATORY)
+
+All tx must follow:
+
+1. Input validation
+2. Simulation (eth_call / dry-run)
+3. Gas estimation
+4. Nonce management
+5. Signing
+6. Broadcast via trusted RPC
+7. Confirmation tracking
+
+Reject if:
+- simulation fails
+- gas spikes beyond threshold
 
 ---
 
-## 7) Final Output Format (Required)
-Return concise but complete release-ready notes containing:
-- **Summary**: concrete file-level changes.
-- **Validation**: checks run and outcomes.
-- **Testing**: command list + pass/fail.
-- **Risks/Follow-ups**: only real items, no placeholders.
+## 6) SWAP ENGINE RULES
 
-If something could not be run, state exact reason and compensating evidence.
+- Must:
+  - Compare multiple routes
+  - Include gas in scoring
+  - Enforce slippage limits
+
+- Prefer:
+  - RFQ / intent-based execution
+  - MEV-protected RPC (Flashbots/private mempool)
+
+- Reject:
+  - single-source routing
+  - unbounded slippage
+
+---
+
+## 7) CARD + FIAT RULES (STRICT)
+
+- PCI data must NEVER enter core backend
+- Use tokenized card providers only
+
+All card flows:
+1. KYC must be completed
+2. Risk engine must approve
+3. Liquidity must be pre-funded
+
+- Must support:
+  - freeze/unfreeze
+  - spend limits
+  - MCC filtering
+
+---
+
+## 8) RPC + INFRA RESILIENCE
+
+- MUST use multi-RPC providers
+- Implement:
+  - fallback routing
+  - circuit breakers
+  - timeout + retry policies
+
+- NEVER rely on single RPC endpoint
+
+---
+
+## 9) EVENT PROCESSING RULES
+
+- All async jobs must be:
+  - idempotent
+  - retry-safe
+
+- Use:
+  - message queues (Kafka/NATS)
+  - deduplication keys
+
+---
+
+## 10) SECURITY HARDENING
+
+- Enforce:
+  - input validation (Zod / strict types)
+  - rate limiting
+  - JWT rotation
+
+- Mobile:
+  - secure storage (keystore)
+  - certificate pinning
+  - root detection
+
+---
+
+## 11) TESTING REQUIREMENTS
+
+Must include:
+- Unit tests (core logic)
+- Integration tests (API + chain)
+- Failure scenarios:
+  - RPC failure
+  - insufficient liquidity
+  - invalid signature
+
+---
+
+## 12) DEPLOYMENT
+
+- Dockerized services
+- Kubernetes-ready
+- Health checks required
+- Observability:
+  - metrics (Prometheus)
+  - logs (structured)
+
+---
+
+## 13) QUALITY GATE
+
+Reject PR if:
+- insecure crypto
+- missing validation
+- centralization risk
+- no test coverage for critical logic
+
+---
+
+## 14) Definition of Done
+
+- docker-compose up works
+- critical flows pass (wallet + swap + card)
+- no security violations
+- logs + metrics visible
+
+---
+
+## 15) Final Output Format
+
+- Summary (file-level changes)
+- Validation (checks run)
+- Testing (commands + results)
+- Risks (real only)
+
+---
+
+## 16) Guiding Principle
+
+If trade-off exists:
+→ prioritize **security > correctness > performance > speed**
