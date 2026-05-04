@@ -100,6 +100,19 @@ zWallet is built as a **hybrid Web2.5 architecture**:
 
 ---
 
+
+## 🛠️ Automated Installer Setup
+
+Use the generated installer configuration to bootstrap and validate the workspace in one command:
+
+```bash
+pnpm setup:auto
+```
+
+Installer definitions live in `scripts/installer.config.json` and are executed by `scripts/run-installer.mjs`.
+
+---
+
 ## 🎯 Vision
 
 To become a **global crypto super app** combining:
