@@ -1,0 +1,11 @@
+rules:
+  - no_balance_mutation: true
+  - require_idempotency: true
+  - require_validation: true
+  - require_audit_log: true
+  - require_rate_limit: true
+
+reject_patterns:
+  - "update balance directly"
+  - "TODO"
+  - "any"
