@@ -92,7 +92,7 @@ zWallet is built as a **hybrid Web2.5 architecture**:
 ## 🏗️ Repository Structure
 
 ```bash
-/apps        # Android app (Kotlin)
+/apps        # Client apps (Android + World App)
 /services    # Backend APIs + workers
 /packages    # Shared crypto + utilities
 /infra       # Docker, Kubernetes, Terraform
