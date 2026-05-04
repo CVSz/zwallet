@@ -101,6 +101,13 @@ This plan converts `docs/00_AGENT_CONTRACT.md` through `docs/11_FINAL_EXECUTION.
 - [ ] `POST /quote` contract + implementation + tests.
 - [ ] `POST /execute` contract + implementation + tests.
 
+### 4.4 Stability foundation
+- [ ] Multi-RPC quorum reads with deterministic provider voting.
+- [ ] Provider health scoring + adaptive routing by chain/region.
+- [ ] Circuit breaker per provider/chain with cool-down + half-open probes.
+- [ ] Chaos tests for RPC brownouts, latency spikes, and partition scenarios.
+
+
 ---
 
 ## 5) Android App Delivery (Source: 05_ANDROID_APP)
@@ -174,6 +181,17 @@ This plan converts `docs/00_AGENT_CONTRACT.md` through `docs/11_FINAL_EXECUTION.
 ### 8.4 Security test mandates
 - [ ] Replay attack test must fail attack path.
 - [ ] Invalid signature test must fail attack path.
+
+
+### 8.5 Custody hardening
+- [ ] Audited MPC provider integration path (keygen/signing/rotation).
+- [ ] Remote signer attestation and policy verification before signing requests.
+- [ ] Full audit trail for MPC requests/responses with secret-safe redaction.
+
+### 8.6 Account abstraction expansion
+- [ ] ERC-4337 bundler integration behind chain-aware adapter interfaces.
+- [ ] UserOperation simulation + reputation-aware bundler failover policy.
+- [ ] Paymaster policy controls with spend/risk guardrails and telemetry.
 
 ---
 
