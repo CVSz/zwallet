@@ -13,6 +13,8 @@ import {
 import * as SecureStore from 'expo-secure-store';
 
 type Chain = 'EVM' | 'Solana' | 'Bitcoin';
+type PaymentRail = 'Card' | 'BankTransfer' | 'Stablecoin' | 'MobileMoney';
+type CardTier = 'Virtual' | 'Premium' | 'Metal';
 
 type Plan = 'free' | 'pro' | 'enterprise';
 
@@ -20,6 +22,8 @@ const API = process.env.EXPO_PUBLIC_API_URL ?? 'http://localhost:8080';
 
 const plans: Plan[] = ['free', 'pro', 'enterprise'];
 const chains: Chain[] = ['EVM', 'Solana', 'Bitcoin'];
+const paymentRails: PaymentRail[] = ['Card', 'BankTransfer', 'Stablecoin', 'MobileMoney'];
+const cardTiers: CardTier[] = ['Virtual', 'Premium', 'Metal'];
 
 export default function App() {
   const [tenantId, setTenantId] = useState('demo-tenant');
@@ -27,6 +31,9 @@ export default function App() {
   const [tenantRegion, setTenantRegion] = useState('us-east-1');
   const [selectedChain, setSelectedChain] = useState<Chain>('EVM');
   const [strictPolicyMode, setStrictPolicyMode] = useState(true);
+  const [paymentRail, setPaymentRail] = useState<PaymentRail>('Card');
+  const [cardTier, setCardTier] = useState<CardTier>('Virtual');
+  const [spendLimitUsd, setSpendLimitUsd] = useState('2500');
   const [simulateOnly, setSimulateOnly] = useState(false);
   const [status, setStatus] = useState('Ready');
   const [intentId, setIntentId] = useState('');
@@ -61,7 +68,10 @@ export default function App() {
           'x-tenant-region': tenantRegion,
           'x-wallet-chain': selectedChain,
           'x-policy-mode': strictPolicyMode ? 'strict' : 'standard',
-          'x-simulate-only': `${simulateOnly}`
+          'x-simulate-only': `${simulateOnly}`,
+          'x-payment-rail': paymentRail,
+          'x-card-tier': cardTier,
+          'x-card-spend-limit-usd': spendLimitUsd.trim() || '0'
         }
       });
 
@@ -145,6 +155,47 @@ export default function App() {
           </View>
         </View>
 
+
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Crypto Card + Payment Rails</Text>
+          <Text style={styles.helperText}>Choose settlement rail and card tier for fiat checkout + crypto funding flows.</Text>
+
+          <Text style={styles.label}>Payment rail</Text>
+          <View style={styles.chipRow}>
+            {paymentRails.map((rail) => (
+              <Pressable
+                key={rail}
+                style={[styles.chip, paymentRail === rail && styles.chipSelected]}
+                onPress={() => setPaymentRail(rail)}
+              >
+                <Text style={[styles.chipText, paymentRail === rail && styles.chipTextSelected]}>{rail}</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={styles.label}>Card tier</Text>
+          <View style={styles.chipRow}>
+            {cardTiers.map((tier) => (
+              <Pressable
+                key={tier}
+                style={[styles.chip, cardTier === tier && styles.chipSelected]}
+                onPress={() => setCardTier(tier)}
+              >
+                <Text style={[styles.chipText, cardTier === tier && styles.chipTextSelected]}>{tier}</Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={styles.label}>Card spend limit (USD)</Text>
+          <TextInput
+            value={spendLimitUsd}
+            onChangeText={setSpendLimitUsd}
+            keyboardType='numeric'
+            placeholder='2500'
+            style={styles.input}
+          />
+        </View>
+
         <Pressable
           style={[styles.button, (!readiness || isLoading) && styles.buttonDisabled]}
           onPress={createIntent}
@@ -210,5 +261,6 @@ const styles = StyleSheet.create({
   },
   buttonDisabled: { opacity: 0.5 },
   buttonText: { color: '#fff', fontWeight: '700' },
-  error: { color: '#b91c1c' }
+  error: { color: '#b91c1c' },
+  helperText: { color: '#475569', fontSize: 13 }
 });
