@@ -39,3 +39,24 @@ Required backend services:
 - Unit tests for wallet engine, policy decisions, and transaction orchestration.
 - Integration tests for send/swap happy path and rejection scenarios.
 - Basic smoke test for gateway and health endpoints.
+
+## 8. Deep Think Repository Requirements
+
+### 8.1 Transaction Safety Pipeline
+- Every outbound blockchain transaction must execute this sequence: input validation, simulation/dry-run, gas estimation, nonce management, signing, broadcast, confirmation tracking.
+- Transactions must be rejected when simulation fails or configured gas spike thresholds are exceeded.
+
+### 8.2 RPC Trust & Resilience
+- Chain operations must use multi-provider RPC routing with failover.
+- Circuit breakers, request timeouts, and bounded retries are required for every external RPC call.
+- Single-endpoint RPC dependency is not allowed in production paths.
+
+### 8.3 Financial & Event Idempotency
+- All payment, card, and chain submission endpoints must accept idempotency keys.
+- Async jobs must support safe retries and deduplication keys.
+- Reprocessing an already-completed financial event must produce a deterministic no-op response.
+
+### 8.4 Wallet Signing Boundaries
+- Private keys must remain in client-side secure storage or MPC boundaries only.
+- Backend services are orchestration-only and must never persist raw seed/private key material.
+- Signing logic must verify chain ID and nonce before signature emission.

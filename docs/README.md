@@ -23,6 +23,8 @@ This index provides a clean entrypoint to project documentation and recommended 
 - `requirements/TECHNICAL_REQUIREMENTS.md`
 - `requirements/NON_FUNCTIONAL_REQUIREMENTS.md`
 
+Technical requirements include the repository's Deep Think constraints for transaction safety, RPC resiliency, and idempotent financial/event processing.
+
 ## Security Deep Dive
 
 - `security/THREAT_MODEL.md`
