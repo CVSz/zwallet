@@ -1,0 +1,45 @@
+global:
+  namespace: zwallet
+
+postgresql:
+  enabled: true
+  architecture: replication
+  auth:
+    postgresPassword: "securepassword"
+  primary:
+    persistence:
+      enabled: true
+      size: 20Gi
+
+redis:
+  enabled: true
+  architecture: cluster
+  cluster:
+    nodes: 6
+  auth:
+    enabled: false
+
+kafka:
+  enabled: true
+  kraft:
+    enabled: true
+  replicaCount: 3
+  persistence:
+    enabled: true
+    size: 10Gi
+
+api:
+  replicaCount: 3
+  image: zwallet/api:latest
+  resources:
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: zwallet.local
+      paths:
+        - /
