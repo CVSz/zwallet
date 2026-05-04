@@ -19,8 +19,8 @@ object NetworkModule {
     @Singleton
     fun provideOkHttpClient(): OkHttpClient {
         val certPinner = CertificatePinner.Builder()
-            .add("api.zwallet.com", "sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
-            .add("api.zwallet.com", "sha256/BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB=")
+            .add("api.zwallet.com", "sha256/afWiKY3RxoMmL6yVxwM9f6QxWQGoaXwGZ0k2v0n1M9U=")
+            .add("api.zwallet.com", "sha256/3W2J7g9X8f0u6m7J9YnE3wB9nIY2k4I7m9dXQ0u5w7Q=")
             .build()
 
         return OkHttpClient.Builder()
