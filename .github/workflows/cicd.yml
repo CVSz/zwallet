@@ -118,7 +118,7 @@ jobs:
       - name: Validate rollout
         run: kubectl rollout status deploy/zwallet-gateway -n "$K8S_NAMESPACE" --timeout=180s
       - name: Rollback on failure
-        if: failure()
+        if: failure() && env.AWS_REGION != '' && env.EKS_CLUSTER_NAME != ''
         run: |
           set -euo pipefail
           : "${AWS_REGION:?AWS_REGION is required}"
@@ -128,3 +128,7 @@ jobs:
           kubectl config current-context
           kubectl rollout undo deploy/zwallet-gateway -n "$K8S_NAMESPACE"
           kubectl patch service zwallet-gateway -n "$K8S_NAMESPACE" -p '{"spec":{"selector":{"app":"zwallet-gateway","track":"blue"}}}'
+      - name: Skip rollback when deployment variables are missing
+        if: failure() && (env.AWS_REGION == '' || env.EKS_CLUSTER_NAME == '')
+        run: |
+          echo "::warning::Skipping rollback because AWS_REGION or EKS_CLUSTER_NAME is not configured."
