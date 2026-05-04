@@ -60,18 +60,11 @@ jobs:
     needs: build-and-push
     if: github.ref == 'refs/heads/main'
     env:
-      AWS_REGION: ${{ vars.AWS_REGION }}
+      AWS_REGION: ${{ vars.AWS_REGION || 'ap-southeast-1' }}
       EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
       K8S_NAMESPACE: default
     steps:
       - uses: actions/checkout@v4
-      - name: Configure AWS credentials via OIDC
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::171518635073:role/github-oidc-zwallet
-          aws-region: ${{ env.AWS_REGION }}
-      - name: Configure kubectl
-        uses: azure/setup-kubectl@v4
       - name: Validate required deployment variables
         run: |
           set -e
@@ -87,6 +80,13 @@ jobs:
           if [ "$missing" -ne 0 ]; then
             exit 1
           fi
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::171518635073:role/github-oidc-zwallet
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Configure kubectl
+        uses: azure/setup-kubectl@v4
       - name: Debug AWS identity
         run: |
           set -e
