@@ -1,14 +1,31 @@
 # api/requirements.in
+
+# Core
 fastapi
 uvicorn[standard]
 pydantic
 pydantic-settings
-psycopg2
+
+# Database
+psycopg[binary]
 SQLAlchemy
 alembic
+
+# Security
 python-jose[cryptography]
-passlib[bcrypt]
+cryptography>=42.0.0
+
+# HTTP
 httpx
+
+# Observability
 structlog
 prometheus-client
+
+# Utils
 python-dotenv
+
+# CVE patches (transitive overrides)
+starlette>=0.37.2
+pyasn1>=0.6.0
+ecdsa>=0.19.0
