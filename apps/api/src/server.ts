@@ -1,7 +1,7 @@
 import Fastify from "fastify";
 import rateLimit from "@fastify/rate-limit";
 import { z } from "zod";
-import { IntentRouter } from "@zwallet/router";
+import { randomUUID } from "node:crypto";
 import { createWorldcoinReposRoute } from "./worldcoinRepos.js";
 import { createEventBusFromEnv, Events, type EventEnvelope } from "@zwallet/events";
 
@@ -11,11 +11,6 @@ await app.register(rateLimit, {
   max: 100,
   timeWindow: "1 minute",
 });
-
-const router = new IntentRouter([
-  "https://solver-1.internal",
-  "https://solver-2.internal",
-]);
 
 const eventBus = createEventBusFromEnv(process.env);
 await eventBus.connect();
@@ -32,10 +27,16 @@ app.post("/swap/quote", async (req, reply) => {
   });
 
   const body = bodySchema.parse(req.body);
-  const quotes = await router.fetchQuotes(body);
-  const best = router.pickBest(quotes);
+  const envelope: EventEnvelope<typeof body> = {
+    eventId: randomUUID(),
+    idempotencyKey: `swap:${body.user}:${body.fromToken}:${body.toToken}:${body.amount}`,
+    event: Events.SWAP_REQUESTED,
+    payload: body,
+    timestamp: new Date().toISOString(),
+  };
 
-  return reply.send(best);
+  await eventBus.publish(Events.SWAP_REQUESTED, envelope);
+  return reply.code(202).send({ status: "queued", idempotencyKey: envelope.idempotencyKey });
 });
 
 app.post('/tx/send', async (req, reply) => {
@@ -49,6 +50,7 @@ app.post('/tx/send', async (req, reply) => {
 
   const body = bodySchema.parse(req.body);
   const envelope: EventEnvelope<typeof body> = {
+    eventId: randomUUID(),
     idempotencyKey: `${body.chainId}:${body.from}:${body.nonce}`,
     event: Events.TX_REQUESTED,
     payload: body,

@@ -1,4 +1,5 @@
 import { Kafka } from 'kafkajs';
+import type { EventEnvelope } from './types.js';
 
 export type EventHandler<T = unknown> = (message: T) => Promise<void>;
 
@@ -57,6 +58,34 @@ export class KafkaEventBus implements EventBus {
         await handler(parsed);
       },
     });
+  }
+}
+
+export async function withRetry<T>(operation: () => Promise<T>, maxAttempts = 3): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (attempt === maxAttempts) {
+        throw lastError;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 100 * attempt));
+    }
+  }
+  throw lastError;
+}
+
+export class EventDeduplicator {
+  private readonly seenKeys = new Set<string>();
+
+  shouldProcess(envelope: EventEnvelope): boolean {
+    if (this.seenKeys.has(envelope.idempotencyKey)) {
+      return false;
+    }
+    this.seenKeys.add(envelope.idempotencyKey);
+    return true;
   }
 }
 
