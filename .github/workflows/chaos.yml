@@ -1,0 +1,14 @@
+name: Chaos Test
+
+on:
+  pull_request:
+
+jobs:
+  chaos:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run chaos test
+        run: bash tests/chaos/kill-pod.sh
