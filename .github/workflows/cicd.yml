@@ -120,6 +120,11 @@ jobs:
       - name: Validate rollout
         if: steps.deploy_vars.outputs.deploy_enabled == 'true'
         run: kubectl rollout status deploy/zwallet-gateway -n "$K8S_NAMESPACE" --timeout=180s
+      - name: Chaos Test
+        if: steps.deploy_vars.outputs.deploy_enabled == 'true'
+        run: |
+          kubectl apply -f infra/chaos/chaos-pipeline.yaml -n "$K8S_NAMESPACE"
+          kubectl wait --for=condition=complete job/chaos-verification-pipeline -n "$K8S_NAMESPACE" --timeout=300s
       - name: Rollback on failure
         if: failure() && steps.deploy_vars.outputs.deploy_enabled == 'true'
         run: |
