@@ -27,4 +27,4 @@ async def block(identity: str):
     try:
         await r.set(f"block:{identity}", "1", ex=BLOCK_TTL)
     except Exception:
-        pass
+        return

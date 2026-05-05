@@ -3,7 +3,6 @@
 
 import os
 import re
-import time
 import jwt
 import aioredis
 from starlette.middleware.base import BaseHTTPMiddleware

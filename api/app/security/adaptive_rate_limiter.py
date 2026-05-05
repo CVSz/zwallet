@@ -2,7 +2,6 @@
 # Adaptive + token/IP hybrid rate limiting with Redis
 
 import os
-import time
 import aioredis
 
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
@@ -22,7 +21,6 @@ async def check_rate(identity: str, weight: int = 1) -> bool:
     r = await get_redis()
 
     key = f"rate:{identity}"
-    now = int(time.time())
 
     try:
         count = await r.incrby(key, weight)

@@ -1,7 +1,6 @@
 # api/app/security/anomaly_detector.py
 # Behavioral anomaly detection (sliding window + scoring)
 
-import time
 import aioredis
 import os
 
@@ -21,7 +20,6 @@ async def record_request(identity: str) -> int:
     r = await get_redis()
     key = f"anomaly:{identity}"
 
-    now = int(time.time())
     try:
         count = await r.incr(key)
         if count == 1:
