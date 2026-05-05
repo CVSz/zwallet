@@ -30,6 +30,7 @@ jobs:
             build_mode: autobuild
           - language: java-kotlin
             build_mode: manual
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
