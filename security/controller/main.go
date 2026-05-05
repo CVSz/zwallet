@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kubernetes "k8s.io/client-go/kubernetes"
@@ -18,9 +19,9 @@ import (
 
 // FalcoEvent structure (simplified)
 type FalcoEvent struct {
-	Output string `json:"output"`
-	Priority string `json:"priority"`
-	Rule string `json:"rule"`
+	Output       string            `json:"output"`
+	Priority     string            `json:"priority"`
+	Rule         string            `json:"rule"`
 	OutputFields map[string]string `json:"output_fields"`
 }
 
@@ -56,6 +57,12 @@ func quarantinePod(namespace, pod string) {
 	}
 }
 
+func sanitizeLogField(value string) string {
+	clean := strings.ReplaceAll(value, "\n", " ")
+	clean = strings.ReplaceAll(clean, "\r", " ")
+	return clean
+}
+
 func handler(w http.ResponseWriter, r *http.Request) {
 	var event FalcoEvent
 
@@ -64,7 +71,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[EVENT] %q", event.Output)
+	log.Printf("[EVENT] %q", sanitizeLogField(event.Output))
 
 	// Decision logic (can extend with ML / scoring)
 	if event.Priority == "CRITICAL" || event.Priority == "ERROR" {
