@@ -21,7 +21,7 @@ metadata:
   name: require-zwallet-api-only
 spec:
   images:
-    - glob: "ghcr.io/CVSz/zwallet/api:*"
+    - glob: "ghcr.io/cvsz/zwallet/api:*"
   authorities:
     - keyless:
         identities:

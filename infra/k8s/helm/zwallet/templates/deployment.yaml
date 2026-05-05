@@ -23,4 +23,7 @@ spec:
             - name: REDIS_URL
               value: "redis://redis:6379"
             - name: DATABASE_URL
-              value: "postgresql://postgres:password@postgres:5432/db"
+              valueFrom:
+                secretKeyRef:
+                  name: zwallet-secrets
+                  key: db_url

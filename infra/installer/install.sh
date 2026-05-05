@@ -52,7 +52,7 @@ install_k3s() {
 
 setup_dirs() {
   log "Preparing directories..."
-  mkdir -p /opt/zwallet/{infra,logs,certs}
+  mkdir -p /opt/zwallet/{infra,logs,certs,data/{postgres,redis,es,filebeat}}
 }
 
 generate_certs() {
@@ -69,17 +69,19 @@ run_core_services() {
 
   docker network create zwallet-net || true
 
-  docker run -d --name redis --network zwallet-net \
+  docker run -d --name redis --network zwallet-net --restart=always \
+    -v /opt/zwallet/data/redis:/data \
     -p 6379:6379 redis:7-alpine
 
-  docker run -d --name postgres --network zwallet-net \
+  docker run -d --name postgres --network zwallet-net --restart=always \
     -e POSTGRES_PASSWORD=securepass \
+    -v /opt/zwallet/data/postgres:/var/lib/postgresql/data \
     -p 5432:5432 postgres:16
 
-  docker run -d --name zookeeper --network zwallet-net \
+  docker run -d --name zookeeper --network zwallet-net --restart=always \
     -e ALLOW_ANONYMOUS_LOGIN=yes bitnami/zookeeper:latest
 
-  docker run -d --name kafka --network zwallet-net \
+  docker run -d --name kafka --network zwallet-net --restart=always \
     -e KAFKA_CFG_ZOOKEEPER_CONNECT=zookeeper:2181 \
     -e ALLOW_PLAINTEXT_LISTENER=yes \
     -p 9092:9092 bitnami/kafka:latest
@@ -87,22 +89,25 @@ run_core_services() {
 
 run_edge_waf() {
   log "Starting NGINX (WAF)..."
-  docker run -d --name nginx-waf --network zwallet-net \
+  docker run -d --name nginx-waf --network zwallet-net --restart=always \
     -p 80:80 nginx:alpine
 }
 
 run_siem() {
   log "Starting SIEM stack..."
 
-  docker run -d --name elasticsearch --network zwallet-net \
+  docker run -d --name elasticsearch --network zwallet-net --restart=always \
     -e discovery.type=single-node \
-    -e xpack.security.enabled=false \
+    -e xpack.security.enabled=true \
+    -v /opt/zwallet/data/es:/usr/share/elasticsearch/data \
     -p 9200:9200 docker.elastic.co/elasticsearch/elasticsearch:8.13.0
 
-  docker run -d --name kibana --network zwallet-net \
+  docker run -d --name kibana --network zwallet-net --restart=always \
     -p 5601:5601 docker.elastic.co/kibana/kibana:8.13.0
 
-  docker run -d --name filebeat --network zwallet-net \
+  docker run -d --name filebeat --network zwallet-net --restart=always \
+    -v /opt/zwallet/logs:/app/logs:ro \
+    -v /opt/zwallet/data/filebeat:/usr/share/filebeat/data \
     docker.elastic.co/beats/filebeat:8.13.0
 }
 
