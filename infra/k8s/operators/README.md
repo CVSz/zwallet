@@ -1,67 +1,48 @@
-# Operators Deployment (Production HA)
+# Operators Deployment Pack (Production HA)
 
-This directory defines production-grade operators for:
-- PostgreSQL (Zalando Patroni Operator)
-- Redis (Bitnami Redis Cluster)
-- Vault (HashiCorp Vault Helm)
-- Istio (Service Mesh Full)
+This folder now contains deployable operator artifacts (not docs-only) for:
+- PostgreSQL HA via Zalando Postgres Operator + Patroni CRD
+- Redis HA via Bitnami Redis Cluster Helm overrides
+- Vault HA via HashiCorp Vault Helm overrides + k8s auth RBAC
+- Istio ingress + service policy manifests
 
----
+## Files
 
-## 1. PostgreSQL Operator (Patroni)
+- `postgres-cluster.yaml` — Patroni-managed Postgres cluster custom resource
+- `redis-values.yaml` — Redis cluster production overrides (cluster mode, persistence, anti-affinity, PDB)
+- `vault-values.yaml` — Vault HA + injector values
+- `vault-auth.yaml` — Kubernetes auth service account + tokenreview binding
+- `istio-gateway.yaml` — ingress gateway
+- `istio-destination-rule.yaml` — mTLS + outlier detection policy
+- `istio-authorization-policy.yaml` — namespace-level service access policy
+- `namespace-labels.yaml` — sidecar injection namespace label
+- `deploy-operators.sh` — one-command deployment automation
 
-```bash
-helm repo add zalando https://opensource.zalando.com/postgres-operator/charts/postgres-operator
-helm install postgres-operator zalando/postgres-operator
-```
-
----
-
-## 2. Redis Cluster
-
-```bash
-helm repo add bitnami https://charts.bitnami.com/bitnami
-helm install redis bitnami/redis-cluster
-```
-
----
-
-## 3. Vault (Secrets)
+## One-command deploy
 
 ```bash
-helm repo add hashicorp https://helm.releases.hashicorp.com
-helm install vault hashicorp/vault
+./infra/k8s/operators/deploy-operators.sh
 ```
 
-Enable Kubernetes auth:
+## Post-deploy checks
 
 ```bash
-vault auth enable kubernetes
+kubectl get postgresql -n zwallet
+kubectl get pods -n zwallet -l application=spilo
+kubectl get pods -n zwallet -l app.kubernetes.io/name=redis-cluster
+kubectl get pods -n zwallet -l app.kubernetes.io/name=vault
+kubectl get gateway,destinationrule,authorizationpolicy -n zwallet
 ```
 
----
-
-## 4. Istio (Full Mesh)
+## Failover simulation
 
 ```bash
-curl -L https://istio.io/downloadIstio | sh -
-cd istio-*
-./bin/istioctl install --set profile=demo -y
+kubectl delete pod -n zwallet -l application=spilo --wait=false
+kubectl get postgresql -n zwallet -w
 ```
-
-Enable mTLS:
-
-```yaml
-apiVersion: security.istio.io/v1beta1
-kind: PeerAuthentication
-spec:
-  mtls:
-    mode: STRICT
-```
-
----
 
 ## Notes
-- All components support HA and failover
-- Must be deployed on multi-node k8s cluster
-- Integrate with existing Helm chart
+
+- CRDs for Postgres Operator are installed by Helm chart installation in `deploy-operators.sh`.
+- Vault initialization/unseal procedure depends on your KMS/HSM strategy and should be run via secure ops runbook.
+- Apply these changes only on multi-node Kubernetes clusters.
