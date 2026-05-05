@@ -9,6 +9,22 @@ import aioredis
 import logging
 from datetime import datetime
 
+from admin.panel.enterprise.security_hardening import enforce_mtls
+from admin.panel.enterprise.audit_store import append_audit
+from admin.panel.enterprise.zero_trust import enforce_zero_trust
+
+@app.post("/admin/security/unblock")
+async def unblock(identity: str, request: Request, user=Depends(verify_admin)):
+    enforce_mtls(request)
+    enforce_zero_trust(request, user["sub"])
+
+    r = await get_redis()
+    await r.delete(f"block:{identity}")
+
+    await append_audit(user["sub"], "unblock", identity)
+
+    return {"unblocked": identity}
+    
 app = FastAPI(title="zWallet Enterprise Admin")
 security = HTTPBearer()
 
