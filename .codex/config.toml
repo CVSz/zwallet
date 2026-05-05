@@ -1,0 +1,42 @@
+#:schema https://developers.openai.com/codex/config-schema.json
+
+model = "gpt-5.3-codex"
+model_reasoning_effort = "high"
+
+approval_policy = "on-request"
+sandbox_mode = "workspace-write"
+
+shell_environment_policy = { inherit = "minimal" }
+
+[mcp_servers.default]
+supports_parallel_tool_calls = false
+default_tools_approval_mode = "prompt"
+
+[project]
+name = "zwallet"
+mode = "production"
+single_source_of_truth = "docs/MASTER_SSOT.md"
+
+[profiles.review]
+model_reasoning_effort = "high"
+approval_policy = "never"
+
+[profiles.implementation]
+model_reasoning_effort = "high"
+approval_policy = "on-request"
+
+[profiles.audit]
+model_reasoning_effort = "high"
+approval_policy = "never"
+
+[observability]
+require_trace_id = true
+structured_logging = true
+
+[security]
+zero_trust = true
+require_idempotency = true
+enforce_ledger_invariants = true
+
+[notify]
+on_completion = true
