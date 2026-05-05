@@ -60,12 +60,13 @@ jobs:
       - name: Sign image (cosign keyless)
         uses: sigstore/cosign-installer@v3
 
+      - name: Push image
+        run: |
+          docker push ghcr.io/${{ github.repository }}/api:secure
+
       - name: Cosign sign
         env:
           COSIGN_EXPERIMENTAL: "true"
         run: |
-          cosign sign ghcr.io/${{ github.repository }}/api:secure
-
-      - name: Push image
-        run: |
-          docker push ghcr.io/${{ github.repository }}/api:secure
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/${{ github.repository }}/api:secure)
+          cosign sign --yes "${DIGEST}"
