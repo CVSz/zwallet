@@ -85,8 +85,8 @@ export class WalletEngine {
       throw new Error('BIP39 mnemonic size must be 12/15/18/21/24 words');
     }
 
-    const entropy = randomBytes((words / 3) * 4);
-    const mnemonic = Array.from({ length: words }, (_, i) => WORDLIST[entropy[i] % WORDLIST.length]).join(' ');
+    const entropy = randomBytes(words);
+    const mnemonic = Array.from({ length: words }, (_, i) => WORDLIST[entropy[i] & 0x07]).join(' ');
     wipe(entropy);
     return mnemonic;
   }

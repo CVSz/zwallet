@@ -6,6 +6,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -63,7 +64,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("[EVENT] %s", event.Output)
+	log.Printf("[EVENT] %q", event.Output)
 
 	// Decision logic (can extend with ML / scoring)
 	if event.Priority == "CRITICAL" || event.Priority == "ERROR" {
@@ -88,6 +89,6 @@ func main() {
 
 	http.HandleFunc("/falco", handler)
 
-	log.Printf("[START] Autonomous Security Controller running on :%s", port)
+	log.Print(fmt.Sprintf("[START] Autonomous Security Controller running on :%s", port))
 	log.Fatal(http.ListenAndServe(":"+port, nil))
 }

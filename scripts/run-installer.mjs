@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { access, readFile } from 'node:fs/promises';
+import { open } from 'node:fs/promises';
 import { constants } from 'node:fs';
 import { spawn } from 'node:child_process';
 import path from 'node:path';
@@ -32,9 +32,9 @@ function assertNodeMajor(requiredMajor) {
 }
 
 const configPath = resolveConfigPath();
-await access(configPath, constants.R_OK);
-
-const raw = await readFile(configPath, 'utf8');
+const fd = await open(configPath, constants.O_RDONLY | constants.O_NOFOLLOW);
+const raw = await fd.readFile('utf8');
+await fd.close();
 const config = JSON.parse(raw);
 
 if (!Array.isArray(config.steps) || config.steps.length === 0) {
