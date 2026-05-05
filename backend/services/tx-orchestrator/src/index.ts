@@ -3,6 +3,25 @@ import { WalletEngine, type TxPayload } from '@zwallet/shared';
 
 const app = Fastify({ logger: true });
 const engine = new WalletEngine();
+const rateLimitStore = new Map<string, { count: number; windowStart: number }>();
+
+app.addHook('onRequest', async (req, reply) => {
+  const key = req.ip;
+  const now = Date.now();
+  const windowMs = 60_000;
+  const maxRequests = 120;
+  const current = rateLimitStore.get(key);
+
+  if (!current || now - current.windowStart >= windowMs) {
+    rateLimitStore.set(key, { count: 1, windowStart: now });
+    return;
+  }
+
+  current.count += 1;
+  if (current.count > maxRequests) {
+    return reply.code(429).send({ error: 'rate_limit_exceeded' });
+  }
+});
 
 app.get('/health', async () => ({ service: 'tx-orchestrator', status: 'ok', timestamp: new Date().toISOString() }));
 
