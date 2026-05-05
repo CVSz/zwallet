@@ -63,7 +63,7 @@ jobs:
 
       - name: Build Java/Kotlin sources for CodeQL
         if: matrix.language == 'java-kotlin'
-        run: gradle --no-daemon -p android-app assemble
+        run: gradle --no-daemon -p android-app :app:assembleDebug
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
