@@ -23,7 +23,7 @@ jobs:
       matrix:
         include:
           - language: javascript-typescript
-            build_mode: autobuild
+            build_mode: none
           - language: python
             build_mode: autobuild
           - language: go
@@ -37,7 +37,7 @@ jobs:
           fetch-depth: 0
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build_mode }}
@@ -45,9 +45,9 @@ jobs:
 
       - name: Autobuild
         if: matrix.build_mode == 'autobuild'
-        uses: github/codeql-action/autobuild@v3
+        uses: github/codeql-action/autobuild@v4
 
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: '/language:${{ matrix.language }}'
