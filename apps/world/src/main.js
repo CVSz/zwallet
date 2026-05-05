@@ -9,6 +9,7 @@ const app = document.querySelector("#app");
 
 const isAddress = (value) => /^0x[a-fA-F0-9]{40}$/.test(value);
 const isAmount = (value) => Number.isFinite(Number(value)) && Number(value) > 0;
+const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 
 function section(title, content) {
   return `<section class="card"><h2>${title}</h2>${content}</section>`;
@@ -18,8 +19,8 @@ function renderWallet() {
   const { wallet } = state;
   const preview = wallet.stage === "preview";
   return section("Wallet Transfer", `
-    <label>Recipient address <input id="wallet-address" value="${wallet.address}" placeholder="0x..." /></label>
-    <label>Amount <input id="wallet-amount" value="${wallet.amount}" placeholder="0.00" /></label>
+    <label>Recipient address <input id="wallet-address" value="${escapeHtml(wallet.address)}" placeholder="0x..." /></label>
+    <label>Amount <input id="wallet-amount" value="${escapeHtml(wallet.amount)}" placeholder="0.00" /></label>
     <div class="actions">
       <button id="wallet-preview">Validate & Preview</button>
       <button id="wallet-submit" ${preview ? "" : "disabled"}>Sign & Submit</button>
@@ -32,12 +33,12 @@ function renderWallet() {
 function renderSwap() {
   const { swap } = state;
   const preview = swap.stage === "preview";
-  const route = swap.route ? `<li>Route: ${swap.route.path}</li><li>Net score: ${swap.route.score.toFixed(4)}</li><li>Estimated gas: ${swap.route.gasUsd.toFixed(2)} USD</li>` : "";
+  const route = swap.route ? `<li>Route: ${escapeHtml(swap.route.path)}</li><li>Net score: ${swap.route.score.toFixed(4)}</li><li>Estimated gas: ${swap.route.gasUsd.toFixed(2)} USD</li>` : "";
   return section("Swap Engine", `
-    <label>From <input id="swap-from" value="${swap.from}" /></label>
-    <label>To <input id="swap-to" value="${swap.to}" /></label>
-    <label>Amount <input id="swap-amount" value="${swap.amount}" placeholder="0.00" /></label>
-    <label>Slippage % <input id="swap-slippage" value="${swap.slippage}" /></label>
+    <label>From <input id="swap-from" value="${escapeHtml(swap.from)}" /></label>
+    <label>To <input id="swap-to" value="${escapeHtml(swap.to)}" /></label>
+    <label>Amount <input id="swap-amount" value="${escapeHtml(swap.amount)}" placeholder="0.00" /></label>
+    <label>Slippage % <input id="swap-slippage" value="${escapeHtml(swap.slippage)}" /></label>
     <div class="actions">
       <button id="swap-preview">Quote & Preview</button>
       <button id="swap-submit" ${preview ? "" : "disabled"}>Execute Swap</button>
@@ -52,7 +53,7 @@ function renderCard() {
   const { card } = state;
   return section("Card Controls", `
     <p>Card state: <strong>${card.frozen ? "Frozen" : "Active"}</strong></p>
-    <label>Spend limit (USD) <input id="card-limit" value="${card.spendLimit}" /></label>
+    <label>Spend limit (USD) <input id="card-limit" value="${escapeHtml(card.spendLimit)}" /></label>
     <label class="row"><input id="card-mcc" type="checkbox" ${card.mccFilterEnabled ? "checked" : ""} /> MCC filtering enabled</label>
     <div class="actions">
       <button id="card-toggle">${card.frozen ? "Unfreeze" : "Freeze"} Card</button>
@@ -71,7 +72,7 @@ function renderFiat() {
       <li>Risk engine: ${fiat.risk}</li>
       <li>Liquidity: ${fiat.liquidity}</li>
     </ul>
-    <label>Withdrawal amount (USD) <input id="fiat-amount" value="${fiat.amount}" /></label>
+    <label>Withdrawal amount (USD) <input id="fiat-amount" value="${escapeHtml(fiat.amount)}" /></label>
     <div class="actions">
       <button id="fiat-preview">Validate & Preview</button>
       <button id="fiat-submit" ${preview ? "" : "disabled"}>Submit Withdrawal</button>

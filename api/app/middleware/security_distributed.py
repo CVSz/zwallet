@@ -17,9 +17,14 @@ redis = None
 
 BLOCK_PATTERNS = [
     re.compile(r"(union\\s+select)", re.IGNORECASE),
-    re.compile(r"<script.*?>", re.IGNORECASE),
     re.compile(r"\\.\\./"),
 ]
+
+
+
+def contains_active_markup(value: str) -> bool:
+    lower = value.lower()
+    return '<script' in lower or '%3cscript' in lower
 
 async def get_redis():
     global redis
@@ -49,7 +54,7 @@ class DistributedSecurityMiddleware(BaseHTTPMiddleware):
 
         # ---- waf ----
         path = request.url.path.lower()
-        if any(p.search(path) for p in BLOCK_PATTERNS):
+        if any(p.search(path) for p in BLOCK_PATTERNS) or contains_active_markup(path):
             return Response("Blocked by WAF", status_code=403)
 
         return await call_next(request)

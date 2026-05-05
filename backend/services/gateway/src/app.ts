@@ -73,6 +73,11 @@ export const buildApp = (deps: Deps = {}) => {
   });
 
   app.post('/v1/webhooks/issuer/auth', async (req: any, reply) => {
+    const webhookRateKey = `rl:webhook:issuer:${req.ip}`;
+    const webhookCount = await rateLimiter.incr(webhookRateKey);
+    if (webhookCount === 1) await rateLimiter.expire(webhookRateKey, 60);
+    if (webhookCount > 60) return reply.code(429).send({ error: 'rate_limit_exceeded' });
+
     const signature = req.headers['x-issuer-signature'];
     const nonce = req.headers['x-issuer-nonce'];
     if (!signature || !nonce) return reply.code(401).send({ error: 'missing_webhook_signature' });
