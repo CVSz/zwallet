@@ -53,7 +53,7 @@ class WalletRepositoryImpl @Inject constructor(@ApplicationContext context: Cont
     override suspend fun send(to: String, token: String, amount: Double): String {
         require(to.startsWith("0x") && to.length >= 10) { "Invalid recipient address" }
         require(amount > 0) { "Amount must be greater than zero" }
-        val txHash = "tx_${to.take(6)}_$token_$amount"
+        val txHash = "tx_${to.take(6)}_${token}_${amount}"
         val updated = listOf(Transaction(txHash, "Ethereum", amount, "2026-05-04T00:00:00Z", "PENDING")) + txState.value
         txState.value = updated
         persistTransactions(updated)
