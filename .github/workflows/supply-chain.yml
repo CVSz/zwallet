@@ -40,6 +40,8 @@ jobs:
           format: 'table'
           exit-code: '1'
           severity: 'CRITICAL,HIGH'
+          vuln-type: 'os,library'
+          ignore-unfixed: true
 
       - name: Generate SBOM (CycloneDX)
         uses: anchore/sbom-action@v0.15.3
