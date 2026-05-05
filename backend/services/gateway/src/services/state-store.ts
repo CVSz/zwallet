@@ -8,6 +8,17 @@ type CacheLike = {
   lrange: (k: string, start: number, stop: number) => Promise<string[]>;
   hget: (k: string, f: string) => Promise<string | null>;
   hset: (k: string, ...args: string[]) => Promise<number>;
+  del: (k: string) => Promise<number>;
+};
+
+export type TxStep = { step: number; name: string; status: 'completed' | 'failed'; error?: string; txHash?: string };
+export type TxLifecycleState = {
+  id: string;
+  userId: string;
+  payload: Record<string, unknown>;
+  steps: TxStep[];
+  status: 'created' | 'failed' | 'confirmed';
+  updatedBalances?: { from?: number; to?: number };
 };
 
 export class GatewayStateStore {
@@ -42,4 +53,14 @@ export class GatewayStateStore {
   async hasDevice(userId: string, deviceId: string) { return (await this.redis.hget(`devices:${userId}`, deviceId)) === '1'; }
   async appendAudit(action: string, userId: string | undefined, payload: Record<string, unknown>) { await this.redis.lpush('audit:logs', JSON.stringify({ id: randomUUID(), action, userId, payload, createdAt: new Date().toISOString() })); }
   async readAudit(limit = 200) { return (await this.redis.lrange('audit:logs', 0, limit - 1)).map((v) => JSON.parse(v)); }
+
+  async writeTxLifecycle(txId: string, state: TxLifecycleState) {
+    await this.redis.setex(`tx:lifecycle:${txId}`, 86400, JSON.stringify(state));
+  }
+
+  async readTxLifecycle(txId: string): Promise<TxLifecycleState | null> {
+    const item = await this.redis.get(`tx:lifecycle:${txId}`);
+    if (!item) return null;
+    return JSON.parse(item) as TxLifecycleState;
+  }
 }
