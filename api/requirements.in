@@ -13,7 +13,7 @@ SQLAlchemy
 alembic
 
 # Security
-python-jose[cryptography]>=3.4.0
+PyJWT[crypto]>=2.8.0
 cryptography>=42.0.0
 
 # HTTP
@@ -29,4 +29,3 @@ python-dotenv
 # CVE patches (transitive overrides)
 starlette>=0.40.0
 pyasn1>=0.6.0
-ecdsa>=0.19.1
