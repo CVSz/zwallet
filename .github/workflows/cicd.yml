@@ -58,7 +58,7 @@ jobs:
   deploy-blue-green:
     runs-on: ubuntu-latest
     needs: build-and-push
-    if: github.ref == 'refs/heads/main' && vars.EKS_CLUSTER_NAME != ''
+    if: github.ref == 'refs/heads/main'
     env:
       AWS_REGION: ${{ vars.AWS_REGION || 'ap-southeast-1' }}
       EKS_CLUSTER_NAME: ${{ vars.EKS_CLUSTER_NAME }}
@@ -66,33 +66,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Validate required deployment variables
+        id: deploy_vars
         run: |
           set -e
-          missing=0
-          if [ -z "$AWS_REGION" ]; then
-            echo "::error::Missing required repository variable: AWS_REGION"
-            missing=1
-          fi
-          if [ -z "$EKS_CLUSTER_NAME" ]; then
-            echo "::error::Missing required repository variable: EKS_CLUSTER_NAME"
-            missing=1
-          fi
-          if [ "$missing" -ne 0 ]; then
-            exit 1
+          if [ -z "$AWS_REGION" ] || [ -z "$EKS_CLUSTER_NAME" ]; then
+            echo "deploy_enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Skipping deployment because AWS_REGION or EKS_CLUSTER_NAME is not configured."
+          else
+            echo "deploy_enabled=true" >> "$GITHUB_OUTPUT"
           fi
       - name: Configure AWS credentials via OIDC
+        if: steps.deploy_vars.outputs.deploy_enabled == 'true'
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::171518635073:role/github-oidc-zwallet
           aws-region: ${{ env.AWS_REGION }}
       - name: Configure kubectl
+        if: steps.deploy_vars.outputs.deploy_enabled == 'true'
         uses: azure/setup-kubectl@v4
       - name: Debug AWS identity
+        if: steps.deploy_vars.outputs.deploy_enabled == 'true'
         run: |
           set -e
           aws sts get-caller-identity
 
       - name: Validate EKS cluster exists
+        if: steps.deploy_vars.outputs.deploy_enabled == 'true'
         run: |
           set -e
           if ! aws eks describe-cluster --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION" >/dev/null 2>&1; then
@@ -102,6 +101,7 @@ jobs:
             exit 1
           fi
       - name: Update kubeconfig (ephemeral)
+        if: steps.deploy_vars.outputs.deploy_enabled == 'true'
         run: |
           set -euo pipefail
           : "${AWS_REGION:?AWS_REGION is required}"
@@ -110,15 +110,18 @@ jobs:
           aws eks update-kubeconfig --name "$EKS_CLUSTER_NAME" --region "$AWS_REGION"
           kubectl config current-context
       - name: Verify cluster access
+        if: steps.deploy_vars.outputs.deploy_enabled == 'true'
         run: kubectl get nodes
       - name: Deploy green
+        if: steps.deploy_vars.outputs.deploy_enabled == 'true'
         run: |
           kubectl apply -f k8s/base -n "$K8S_NAMESPACE"
           kubectl patch service zwallet-gateway -n "$K8S_NAMESPACE" -p '{"spec":{"selector":{"app":"zwallet-gateway","track":"green"}}}'
       - name: Validate rollout
+        if: steps.deploy_vars.outputs.deploy_enabled == 'true'
         run: kubectl rollout status deploy/zwallet-gateway -n "$K8S_NAMESPACE" --timeout=180s
       - name: Rollback on failure
-        if: failure() && env.AWS_REGION != '' && env.EKS_CLUSTER_NAME != ''
+        if: failure() && steps.deploy_vars.outputs.deploy_enabled == 'true'
         run: |
           set -euo pipefail
           : "${AWS_REGION:?AWS_REGION is required}"
@@ -128,7 +131,3 @@ jobs:
           kubectl config current-context
           kubectl rollout undo deploy/zwallet-gateway -n "$K8S_NAMESPACE"
           kubectl patch service zwallet-gateway -n "$K8S_NAMESPACE" -p '{"spec":{"selector":{"app":"zwallet-gateway","track":"blue"}}}'
-      - name: Skip rollback when deployment variables are missing
-        if: failure() && (env.AWS_REGION == '' || env.EKS_CLUSTER_NAME == '')
-        run: |
-          echo "::warning::Skipping rollback because AWS_REGION or EKS_CLUSTER_NAME is not configured."
