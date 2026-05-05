@@ -19,3 +19,15 @@ export async function checkIdempotency(key: string): Promise<void> {
     throw new Error('Duplicate request (global)');
   }
 }
+
+export async function enforceIdempotency(eventId: string, db) {
+  try {
+    await db.query(
+      `INSERT INTO event_dedup(event_id) VALUES ($1)`,
+      [eventId]
+    )
+    return false
+  } catch {
+    return true
+  }
+}
