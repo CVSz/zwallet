@@ -37,7 +37,7 @@ spec:
               kinds:
                 - Pod
       verifyImages:
-        - image: "ghcr.io/CVSz/zwallet/api:*"
+        - image: "ghcr.io/cvsz/zwallet/api:*"
           keyless:
             subject: "repo:CVSz/zwallet"
             issuer: "https://token.actions.githubusercontent.com"
