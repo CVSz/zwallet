@@ -6,7 +6,7 @@ import { securityPlugin } from './plugins/security.js';
 import { createHash, createHmac, timingSafeEqual, randomUUID } from 'node:crypto';
 import { RpcProviderPool } from './lib/rpc-provider-pool.js';
 import { InMemoryBundlerClient, UserOperationService } from './services/bundler.js';
-import { GatewayStateStore } from './services/state-store.js';
+import { GatewayStateStore, type TxLifecycleState, type TxStep } from './services/state-store.js';
 import { store } from './utils/store.js';
 import { mpcConfigSchema, MpcSignerService, SandboxMpcProvider } from './services/mpc.js';
 import { RiskEngine } from './services/risk/risk-engine.js';
@@ -119,7 +119,7 @@ export const buildApp = (deps: Deps = {}) => {
           : { lockTime: Date.now() },
     };
 
-    const state: Record<string, unknown> = {
+    const lifecycleState: TxLifecycleState = {
       id: txId,
       userId: req.user.sub,
       payload,
@@ -136,31 +136,31 @@ export const buildApp = (deps: Deps = {}) => {
       body: JSON.stringify({ payload, signatureHex: parsed.data.signatureHex, signerId: parsed.data.from }),
     });
     if (!verifyRes.ok) {
-      state.steps = [...(state.steps as any[]), { step: 3, name: 'backend_validate_request', status: 'failed', error: 'invalid_signature' }];
-      state.status = 'failed';
-      store.lifecycleTx.set(txId, state);
-      return reply.code(400).send({ error: 'invalid_signature', txId, state });
+      lifecycleState.steps = [...lifecycleState.steps, { step: 3, name: 'backend_validate_request', status: 'failed', error: 'invalid_signature' }];
+      lifecycleState.status = 'failed';
+      await state.writeTxLifecycle(txId, lifecycleState);
+      return reply.code(400).send({ error: 'invalid_signature', txId, state: lifecycleState });
     }
 
-    state.steps = [...(state.steps as any[]), { step: 3, name: 'backend_validate_request', status: 'completed' }];
+    lifecycleState.steps = [...lifecycleState.steps, { step: 3, name: 'backend_validate_request', status: 'completed' }];
     const senderBalance = store.balances.get(parsed.data.from) ?? 100;
     const value = Number(parsed.data.value);
     if (!Number.isFinite(value) || value <= 0 || senderBalance < value) {
-      state.steps = [...(state.steps as any[]), { step: 4, name: 'transaction_broadcast_to_chain', status: 'failed', error: 'insufficient_balance' }];
-      state.status = 'failed';
-      store.lifecycleTx.set(txId, state);
-      return reply.code(400).send({ error: 'insufficient_balance', txId, state, available: senderBalance });
+      lifecycleState.steps = [...lifecycleState.steps, { step: 4, name: 'transaction_broadcast_to_chain', status: 'failed', error: 'insufficient_balance' }];
+      lifecycleState.status = 'failed';
+      await state.writeTxLifecycle(txId, lifecycleState);
+      return reply.code(400).send({ error: 'insufficient_balance', txId, state: lifecycleState, available: senderBalance });
     }
 
     if (parsed.data.forceRpcFailure) {
-      state.steps = [...(state.steps as any[]), { step: 4, name: 'transaction_broadcast_to_chain', status: 'failed', error: 'rpc_failure' }];
-      state.status = 'failed';
-      store.lifecycleTx.set(txId, state);
-      return reply.code(502).send({ error: 'rpc_failure', txId, state });
+      lifecycleState.steps = [...lifecycleState.steps, { step: 4, name: 'transaction_broadcast_to_chain', status: 'failed', error: 'rpc_failure' }];
+      lifecycleState.status = 'failed';
+      await state.writeTxLifecycle(txId, lifecycleState);
+      return reply.code(502).send({ error: 'rpc_failure', txId, state: lifecycleState });
     }
 
     const txHash = createHash('sha256').update(`${txId}:${Date.now()}`).digest('hex');
-    state.steps = [...(state.steps as any[]), { step: 4, name: 'transaction_broadcast_to_chain', status: 'completed', txHash }];
+    lifecycleState.steps = [...lifecycleState.steps, { step: 4, name: 'transaction_broadcast_to_chain', status: 'completed', txHash }];
 
     await fetch(`${indexerBase}/indexer/batch`, {
       method: 'POST',
@@ -168,20 +168,20 @@ export const buildApp = (deps: Deps = {}) => {
       body: JSON.stringify({ jobs: [{ idempotencyKey: `${txId}:${req.user.sub}`, chain: parsed.data.chain === 'evm' ? 'evm' : parsed.data.chain === 'solana' ? 'solana' : 'bitcoin', addresses: [parsed.data.from, parsed.data.to], cursor: txHash }] }),
     });
 
-    state.steps = [...(state.steps as any[]), { step: 5, name: 'indexer_detects_transaction', status: 'completed' }];
+    lifecycleState.steps = [...lifecycleState.steps, { step: 5, name: 'indexer_detects_transaction', status: 'completed' }];
     store.balances.set(parsed.data.from, senderBalance - value);
     store.balances.set(parsed.data.to, (store.balances.get(parsed.data.to) ?? 0) + value);
 
-    state.steps = [...(state.steps as any[]), { step: 6, name: 'api_returns_updated_state', status: 'completed' }, { step: 7, name: 'android_reflects_state', status: 'completed' }];
-    state.status = 'confirmed';
-    state.updatedBalances = { from: store.balances.get(parsed.data.from), to: store.balances.get(parsed.data.to) };
-    store.lifecycleTx.set(txId, state);
+    lifecycleState.steps = [...lifecycleState.steps, { step: 6, name: 'api_returns_updated_state', status: 'completed' }, { step: 7, name: 'android_reflects_state', status: 'completed' }];
+    lifecycleState.status = 'confirmed';
+    lifecycleState.updatedBalances = { from: store.balances.get(parsed.data.from), to: store.balances.get(parsed.data.to) };
+    await state.writeTxLifecycle(txId, lifecycleState);
 
-    return { txId, state };
+    return { txId, state: lifecycleState };
   });
 
   app.get('/v1/transactions/lifecycle/:txId', { preHandler: [authGuard] }, async (req: any, reply) => {
-    const tx = store.lifecycleTx.get(req.params.txId);
+    const tx = await state.readTxLifecycle(req.params.txId);
     if (!tx) return reply.code(404).send({ error: 'not_found' });
     return { txId: req.params.txId, state: tx };
   });
