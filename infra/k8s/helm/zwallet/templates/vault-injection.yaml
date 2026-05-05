@@ -1,0 +1,16 @@
+# Vault sidecar injection (simplified)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zwallet-api
+spec:
+  template:
+    metadata:
+      annotations:
+        vault.hashicorp.com/agent-inject: "true"
+        vault.hashicorp.com/role: "zwallet-role"
+        vault.hashicorp.com/agent-inject-secret-db: "secret/data/db"
+    spec:
+      containers:
+        - name: api
+          image: ghcr.io/cvsz/zwallet/api:secure
