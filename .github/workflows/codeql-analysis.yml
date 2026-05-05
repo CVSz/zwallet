@@ -55,10 +55,13 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Setup Gradle for Kotlin analysis
+        if: matrix.language == 'java-kotlin'
+        uses: gradle/actions/setup-gradle@v4
+
       - name: Build Java/Kotlin sources for CodeQL
         if: matrix.language == 'java-kotlin'
-        working-directory: android-app
-        run: ./gradlew --no-daemon assemble
+        run: gradle --no-daemon -p android-app assemble
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
