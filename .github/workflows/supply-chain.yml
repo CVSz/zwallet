@@ -49,6 +49,7 @@ jobs:
           image: ghcr.io/${{ github.repository }}/api:secure
           format: cyclonedx-json
           output-file: sbom.json
+          upload-artifact: false
 
       - name: Upload SBOM
         uses: actions/upload-artifact@v4
