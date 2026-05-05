@@ -20,9 +20,8 @@ from app.application.schemas import (
     QuoteResponseDTO,
     ExecuteRequestDTO,
 )
-from app.middleware.security_distributed import DistributedSecurityMiddleware
-from app.middleware.security_autonomous import AutonomousSecurityMiddleware
-from app.middleware.security_intelligent import IntelligentSecurityMiddleware
+from app.middleware.security_unified import UnifiedSecurityMiddleware, enforce_runtime_prerequisites
+from app.middleware.idempotency_global import GlobalIdempotencyMiddleware
 from app.application.services import AuthService, WalletService
 from app.application.swap import SwapOrchestrator, SwapExecutionError
 from app.infrastructure.blockchain import EthereumClient
@@ -35,6 +34,7 @@ limiter = Limiter(key_func=get_remote_address)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    enforce_runtime_prerequisites()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
@@ -43,9 +43,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="ZWallet API", version="1.0.0", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
-app.add_middleware(DistributedSecurityMiddleware)
-app.add_middleware(AutonomousSecurityMiddleware)
-app.add_middleware(IntelligentSecurityMiddleware)
+app.add_middleware(UnifiedSecurityMiddleware)
+app.add_middleware(GlobalIdempotencyMiddleware)
 
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(_, exc):
