@@ -1,6 +1,5 @@
 import os
 from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.responses import Response
 
 from app.middleware.security_distributed import DistributedSecurityMiddleware
 from app.middleware.security_autonomous import AutonomousSecurityMiddleware

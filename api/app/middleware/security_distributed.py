@@ -1,7 +1,6 @@
 # api/app/middleware/security_distributed.py
 # Distributed security layer using Redis
 
-import time
 import os
 import re
 import aioredis

@@ -224,7 +224,6 @@ export const buildApp = (deps: Deps = {}) => {
     const walletBase = process.env.WALLET_SERVICE_URL ?? 'http://wallet-service:8090';
     const policyBase = process.env.POLICY_SERVICE_URL ?? 'http://policy-service:8094';
     const swapBase = process.env.SWAP_SERVICE_URL ?? 'http://swap-service:8092';
-    const txBase = process.env.TX_ORCHESTRATOR_URL ?? 'http://tx-orchestrator:8091';
     const indexerBase = process.env.INDEXER_SERVICE_URL ?? 'http://indexer-service:8093';
     const portfolioBase = process.env.PORTFOLIO_SERVICE_URL ?? 'http://portfolio-service:8095';
 

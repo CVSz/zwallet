@@ -111,7 +111,6 @@ async def user_behavior_inference(payload: BehaviorEventDTO, _: str = Depends(re
 async def swap_recommendation_inference(
     payload: SwapRecommendationRequestDTO, _: str = Depends(require_user)
 ) -> InferenceResponse:
-    pipeline = FeaturePipeline()
     service = IntelligenceService(VectorStore(provider="pgvector"))
     urgency_map = {"low": 0.2, "medium": 0.5, "high": 0.8}
     feature_vector = [

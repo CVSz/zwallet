@@ -21,7 +21,7 @@ async def shadow_ban(identity: str):
     try:
         await r.set(f"shadow:{identity}", "1", ex=BAN_TTL)
     except Exception:
-        pass
+        return
 
 async def is_shadow_banned(identity: str) -> bool:
     r = await get_redis()
