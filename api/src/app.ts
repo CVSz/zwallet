@@ -10,26 +10,31 @@ app.use(bodyParser.json());
 app.get('/health', (_, res) => res.json({ status: 'ok' }));
 
 // Wallet
-let balances: Record<string, number> = {};
+const balances = new Map<string, number>();
+const allowedUserId = /^[a-zA-Z0-9:_-]{1,64}$/;
+const readBalance = (userId: string) => balances.get(userId) ?? 0;
+const writeBalance = (userId: string, value: number) => balances.set(userId, value);
+const isValidUserId = (userId: unknown): userId is string => typeof userId === 'string' && allowedUserId.test(userId);
 
 app.get('/wallet/balance', verifyHmacV2, (req, res) => {
   const user = req.headers['x-user-id'] as string;
-  res.json({ balance: balances[user] || 0 });
+  if (!isValidUserId(user)) return res.status(400).json({ error: 'Invalid user id' });
+  res.json({ balance: readBalance(user) });
 });
 
 app.post('/wallet/transfer', verifyHmacV2, (req, res) => {
   const { from, to, amount } = req.body;
 
-  if (!from || !to || typeof amount !== 'number' || amount <= 0) {
+  if (!isValidUserId(from) || !isValidUserId(to) || typeof amount !== 'number' || amount <= 0) {
     return res.status(400).json({ error: 'Invalid input' });
   }
 
-  if ((balances[from] || 0) < amount) {
+  if (readBalance(from) < amount) {
     return res.status(400).json({ error: 'Insufficient funds' });
   }
 
-  balances[from] -= amount;
-  balances[to] = (balances[to] || 0) + amount;
+  writeBalance(from, readBalance(from) - amount);
+  writeBalance(to, readBalance(to) + amount);
 
   res.json({ success: true });
 });
@@ -37,21 +42,24 @@ app.post('/wallet/transfer', verifyHmacV2, (req, res) => {
 // Deposit (mock PromptPay)
 app.post('/deposit/promptpay', verifyHmacV2, (req, res) => {
   const { userId, amount } = req.body;
-  if (!userId || amount <= 0) return res.status(400).json({ error: 'Invalid' });
+  if (!isValidUserId(userId) || typeof amount !== 'number' || amount <= 0) return res.status(400).json({ error: 'Invalid' });
 
-  balances[userId] = (balances[userId] || 0) + amount;
+  writeBalance(userId, readBalance(userId) + amount);
   res.json({ status: 'completed' });
 });
 
 // Withdraw (mock)
 app.post('/withdraw/promptpay', verifyHmacV2, (req, res) => {
   const { userId, amount } = req.body;
+  if (!isValidUserId(userId) || typeof amount !== 'number' || amount <= 0) {
+    return res.status(400).json({ error: 'Invalid' });
+  }
 
-  if ((balances[userId] || 0) < amount) {
+  if (readBalance(userId) < amount) {
     return res.status(400).json({ error: 'Insufficient funds' });
   }
 
-  balances[userId] -= amount;
+  writeBalance(userId, readBalance(userId) - amount);
   res.json({ status: 'processing' });
 });
 

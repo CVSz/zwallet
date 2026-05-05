@@ -40,6 +40,12 @@ export const buildApp = (deps: Deps = {}) => {
   app.decorate('replay', new Set<string>());
   app.decorate('rateLimiter', rateLimiter as any);
   app.register(securityPlugin);
+  app.addHook('onRequest', async (req: any, reply) => {
+    const key = `rl:global:${req.ip}`;
+    const count = await rateLimiter.incr(key);
+    if (count === 1) await rateLimiter.expire(key, 60);
+    if (count > 240) return reply.code(429).send({ error: 'rate_limit_exceeded' });
+  });
 
   const authGuard = async (req: any, reply: any) => app.authenticate(req, reply);
   app.setErrorHandler((error, _req, reply) => {

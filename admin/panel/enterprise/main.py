@@ -1,7 +1,7 @@
 # admin/panel/enterprise/main.py
 # Enterprise Admin Control Plane (RBAC + JWT + Audit + Redis)
 
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import jwt
 import os
@@ -9,22 +9,6 @@ import aioredis
 import logging
 from datetime import datetime
 
-from admin.panel.enterprise.security_hardening import enforce_mtls
-from admin.panel.enterprise.audit_store import append_audit
-from admin.panel.enterprise.zero_trust import enforce_zero_trust
-
-@app.post("/admin/security/unblock")
-async def unblock(identity: str, request: Request, user=Depends(verify_admin)):
-    enforce_mtls(request)
-    enforce_zero_trust(request, user["sub"])
-
-    r = await get_redis()
-    await r.delete(f"block:{identity}")
-
-    await append_audit(user["sub"], "unblock", identity)
-
-    return {"unblocked": identity}
-    
 app = FastAPI(title="zWallet Enterprise Admin")
 security = HTTPBearer()
 
@@ -54,7 +38,10 @@ def verify_admin(credentials: HTTPAuthorizationCredentials = Depends(security)):
 
 
 def audit_log(action: str, actor: str, target: str | None = None):
-    logging.info(f"[{datetime.utcnow()}] {actor} -> {action} -> {target}")
+    safe_actor = repr(str(actor))
+    safe_action = repr(str(action))
+    safe_target = repr(str(target)) if target is not None else "None"
+    logging.info("[%s] %s -> %s -> %s", datetime.utcnow().isoformat(), safe_actor, safe_action, safe_target)
 
 
 @app.get("/admin/health")
