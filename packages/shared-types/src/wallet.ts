@@ -24,7 +24,8 @@ export function assertTransferRequest(request: unknown): asserts request is Tran
   }
   assertAddress(payload.from);
   assertAddress(payload.to);
-  if (!/^\d+$/.test(String(payload.amountAtomic))) {
+  const amountAtomic = String(payload.amountAtomic);
+  if (!/^[1-9]\d*$/.test(amountAtomic)) {
     throw new Error('amountAtomic must be a positive integer string');
   }
 }
