@@ -1,32 +1,18 @@
-apiVersion: apps/v1
-kind: StatefulSet
+apiVersion: acid.zalan.do/v1
+kind: postgresql
 metadata:
-  name: postgres-ha
+  name: zwallet-db
   namespace: zwallet
 spec:
-  serviceName: postgres
-  replicas: 2
-  selector:
-    matchLabels:
-      app: postgres
-  template:
-    metadata:
-      labels:
-        app: postgres
-    spec:
-      containers:
-        - name: postgres
-          image: postgres:15
-          ports:
-            - containerPort: 5432
-          volumeMounts:
-            - name: data
-              mountPath: /var/lib/postgresql/data
-  volumeClaimTemplates:
-    - metadata:
-        name: data
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: 10Gi
+  numberOfInstances: 3
+  volume:
+    size: 10Gi
+  teamId: zwallet
+  postgresql:
+    version: "15"
+  users:
+    zwallet:
+      - superuser
+      - createdb
+  databases:
+    zwallet: zwallet

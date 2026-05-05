@@ -60,3 +60,31 @@ CREATE TABLE IF NOT EXISTS reconciliation_snapshots (
   external_balance NUMERIC,
   created_at TIMESTAMP DEFAULT now()
 );
+
+-- 8. Enforce zero-sum journal entries per transaction at commit time
+CREATE OR REPLACE FUNCTION enforce_zero_sum_transaction()
+RETURNS trigger AS $$
+DECLARE
+  tx_balance NUMERIC;
+BEGIN
+  SELECT COALESCE(SUM(
+    CASE WHEN direction = 'credit' THEN amount ELSE -amount END
+  ), 0)
+  INTO tx_balance
+  FROM ledger_entries
+  WHERE transaction_id = NEW.transaction_id;
+
+  IF tx_balance <> 0 THEN
+    RAISE EXCEPTION 'Ledger transaction % is not balanced (net=%)', NEW.transaction_id, tx_balance;
+  END IF;
+
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_enforce_zero_sum_tx ON ledger_entries;
+CREATE CONSTRAINT TRIGGER trg_enforce_zero_sum_tx
+AFTER INSERT OR UPDATE ON ledger_entries
+DEFERRABLE INITIALLY DEFERRED
+FOR EACH ROW
+EXECUTE FUNCTION enforce_zero_sum_transaction();
