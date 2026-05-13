@@ -31,7 +31,9 @@ export interface WalletTransferRecord {
   to: string;
   amountAtomic: string;
   nonce: number;
-  status: 'previewed' | 'queued' | 'signed' | 'broadcasted' | 'failed';
+  status: 'previewed' | 'queued' | 'executing' | 'confirmed' | 'signed' | 'broadcasted' | 'failed' | 'cancelled';
+  txHash?: string;
+  failureReason?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -172,4 +174,14 @@ export function getWalletOverview(): WalletOverview {
     transfers: listWalletTransfers(),
     events: listWalletEvents()
   };
+}
+
+
+export function getWalletTransfer(id: string): WalletTransferRecord | undefined {
+  return transfers.get(id);
+}
+
+export function updateWalletTransfer(record: WalletTransferRecord): WalletTransferRecord {
+  transfers.set(record.id, record);
+  return record;
 }
