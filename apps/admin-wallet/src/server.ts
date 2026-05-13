@@ -6,7 +6,7 @@ import {
   queueWalletTransfer,
   getWalletTransfer,
   updateWalletTransfer,
-  executeTransferSimulation,
+  enqueueTransferExecution,
   type WalletOverview
 } from "@zwallet/wallet-engine";
 import { isSupportedChain, type SupportedChain } from "@zwallet/shared-types/wallet";

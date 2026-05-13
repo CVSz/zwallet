@@ -1,31 +1,52 @@
+import { Worker } from "bullmq";
+
+import { redisConnection } from "../queue/redis.js";
+
 import {
-  markTransferConfirmed,
   markTransferExecuting,
+  markTransferConfirmed,
   markTransferFailed,
-} from "../services/transfers/transferQueue.js";
-import type { WalletTransferRecord } from "../walletEngine.js";
+} from "../services/transfers/index.js";
 
-export interface TransferWorkerResult {
-  transfer: WalletTransferRecord;
-  simulated: boolean;
-}
+const worker = new Worker(
+  "transfer-execution",
+  async (job) => {
+    const transfer = job.data.transfer;
 
-export async function executeTransferSimulation(
-  transfer: WalletTransferRecord
-): Promise<TransferWorkerResult> {
-  const executing = markTransferExecuting(transfer);
+    const executing = markTransferExecuting(transfer);
 
-  await new Promise((resolve) => setTimeout(resolve, 50));
+    await new Promise((resolve) => setTimeout(resolve, 1500));
 
-  if (BigInt(executing.amountAtomic) <= 0n) {
-    return {
-      transfer: markTransferFailed(executing, "amountAtomic must be positive"),
-      simulated: true,
-    };
+    if (BigInt(executing.amountAtomic) <= 0n) {
+      return markTransferFailed(
+        executing,
+        "amountAtomic must be positive"
+      );
+    }
+
+    return markTransferConfirmed(
+      executing,
+      `simulated-${executing.id}`
+    );
+  },
+  {
+    connection: redisConnection,
+    concurrency: 5,
   }
+);
 
-  return {
-    transfer: markTransferConfirmed(executing),
-    simulated: true,
-  };
-}
+worker.on("completed", (job, result) => {
+  console.log(
+    `[transfer-worker] completed ${job.id}`,
+    result?.status
+  );
+});
+
+worker.on("failed", (job, err) => {
+  console.error(
+    `[transfer-worker] failed ${job?.id}`,
+    err
+  );
+});
+
+console.log("[transfer-worker] started");

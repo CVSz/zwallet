@@ -20,6 +20,8 @@
     "typescript": "^5.8.3"
   },
   "dependencies": {
+    "bullmq": "^5.76.8",
+    "ioredis": "^5.10.1",
     "pg": "^8.20.0"
   }
 }

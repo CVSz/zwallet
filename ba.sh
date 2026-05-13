@@ -2,36 +2,34 @@ cd /opt/zwallet || exit 1
 
 set -e
 
-echo "== Fix redis.ts =="
+echo "== Create transfer worker systemd service =="
 
-cat > services/wallet-engine/src/queue/redis.ts <<'EOF'
-import { Redis } from "ioredis";
+sudo tee /etc/systemd/system/zwallet-transfer-worker.service >/dev/null <<'EOF'
+[Unit]
+Description=zWallet transfer worker
+After=network.target redis.service
 
-export const redisConnection = new Redis(
-  process.env.REDIS_URL ?? "redis://127.0.0.1:6379",
-  {
-    maxRetriesPerRequest: null,
-    enableReadyCheck: false,
-  }
-);
+[Service]
+Type=simple
+User=zeazdev
+WorkingDirectory=/opt/zwallet
+Environment=NODE_ENV=production
+Environment=REDIS_URL=redis://127.0.0.1:6379
+ExecStart=/usr/bin/node /opt/zwallet/services/wallet-engine/dist/runTransferWorker.js
+Restart=always
+RestartSec=5
 
-redisConnection.on("connect", () => {
-  console.log("[wallet-engine] redis connected");
-});
-
-redisConnection.on("error", (err: Error) => {
-  console.error("[wallet-engine] redis error", err);
-});
+[Install]
+WantedBy=multi-user.target
 EOF
 
-echo "== Clean build cache =="
+echo "== Reload systemd =="
 
-find . -name 'tsconfig.tsbuildinfo' -delete
+sudo systemctl daemon-reload
 
-echo "== Rebuild =="
+echo "== Enable worker =="
 
-pnpm --filter @zwallet/wallet-engine build
-pnpm --filter @zwallet/admin-wallet build
+sudo systemctl enable zwallet-transfer-worker
 
 echo "== Restart services =="
 
@@ -80,4 +78,4 @@ curl -s https://admin-wallet.zeaz.dev/api/overview \
   | jq '.transfers[0]'
 
 echo
-echo "== PHASE 6 REPAIRED COMPLETE =="
+echo "== PHASE 6 COMPLETE =="
