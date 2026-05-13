@@ -10,6 +10,7 @@ import {
   type WalletOverview
 } from "@zwallet/wallet-engine";
 import { isSupportedChain, type SupportedChain } from "@zwallet/shared-types/wallet";
+import { getOperatorIdentity, requirePermission } from "./auth/index.js";
 import { getRuntimeWalletOverview } from "@zwallet/wallet-engine";
 
 const port = Number(process.env.PORT || 8081);
@@ -125,27 +126,49 @@ function buildAccountInput(payload: Record<string, unknown>): Parameters<typeof 
   return input;
 }
 
+
+function isPublicPath(pathname: string): boolean {
+  return pathname === "/healthz" || pathname === "/readyz";
+}
+
+function authErrorStatus(message: string): number {
+  if (message.startsWith("forbidden:")) return 403;
+  return 401;
+}
+
 const server = http.createServer((req, res) => {
   void (async () => {
     const url = new URL(req.url ?? "/", `http://${req.headers.host ?? "localhost"}`);
+    const identity = getOperatorIdentity(req);
     if ((req.method === "GET" || req.method === "HEAD") && url.pathname === "/healthz") return sendJson(res, 200, { status: "ok", service: "admin-wallet", runtime: "production" });
     if ((req.method === "GET" || req.method === "HEAD") && url.pathname === "/readyz") return sendJson(res, 200, { status: "ready", service: "admin-wallet" });
-    if (req.method === "GET" && url.pathname === "/api/overview") return sendJson(res, 200, await getRuntimeWalletOverview());
+    if (req.method === "GET" && url.pathname === "/api/overview") {
+      requirePermission(identity, "overview:read");
+      return sendJson(res, 200, { ...(await getRuntimeWalletOverview()), operator: identity });
+    }
     if (req.method === "POST" && (url.pathname === "/wallets" || url.pathname === "/api/wallets")) {
+      requirePermission(identity, "wallet:create");
       const payload = req.headers["content-type"]?.includes("application/json") ? await readJson(req) as Record<string, unknown> : await readForm(req);
       const account = createWalletAccount(buildAccountInput(payload));
       return url.pathname.startsWith("/api/") ? sendJson(res, 201, { account }) : redirectHome(res);
     }
     if (req.method === "POST" && (url.pathname === "/transfers/preview" || url.pathname === "/api/transfers/preview")) {
+      requirePermission(identity, "transfer:preview");
       const payload = req.headers["content-type"]?.includes("application/json") ? await readJson(req) as Record<string, unknown> : await readForm(req);
       const transfer = previewWalletTransfer({ chain: parseChain(payload.chain), from: String(payload.from ?? ""), to: String(payload.to ?? ""), amountAtomic: String(payload.amountAtomic ?? "0"), nonce: payload.nonce ? Number(payload.nonce) : undefined, createdAt: new Date().toISOString() });
       return url.pathname.startsWith("/api/") ? sendJson(res, 202, { transfer }) : redirectHome(res);
     }
     const queueMatch = url.pathname.match(/^\/api\/transfers\/([^/]+)\/queue$/);
     if (req.method === "POST" && queueMatch?.[1]) return sendJson(res, 202, { transfer: queueWalletTransfer(queueMatch[1]) });
-    if (req.method === "GET" || req.method === "HEAD") return await sendHtml(res);
+    if (req.method === "GET" || req.method === "HEAD") {
+      if (!isPublicPath(url.pathname)) requirePermission(identity, "overview:read");
+      return await sendHtml(res);
+    }
     return sendJson(res, 405, { error: "method_not_allowed" });
-  })().catch((error: unknown) => sendJson(res, 400, { error: error instanceof Error ? error.message : String(error) }));
+  })().catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error);
+    sendJson(res, authErrorStatus(message), { error: message });
+  });
 });
 
 server.listen(port, () => {
