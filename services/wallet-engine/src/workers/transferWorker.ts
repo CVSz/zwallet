@@ -1,37 +1,44 @@
 import { Worker } from "bullmq";
 
 import { redisConnection } from "../queue/redis.js";
+import { PostgresTransferRepository } from "../repositories/postgres/transfers.js";
 
-import {
-  markTransferExecuting,
-  markTransferConfirmed,
-  markTransferFailed,
-} from "../services/transfers/index.js";
+const repo = process.env.DATABASE_URL
+  ? new PostgresTransferRepository()
+  : undefined;
 
 const worker = new Worker(
   "transfer-execution",
   async (job) => {
-    const transfer = job.data.transfer;
+    const transferId = String(job.data.transferId);
 
-    const executing = markTransferExecuting(transfer);
+    if (!repo) {
+      throw new Error("DATABASE_URL is required for distributed transfer worker");
+    }
+
+    const transfer = await repo.getById(transferId);
+
+    if (!transfer) {
+      throw new Error(`Transfer not found: ${transferId}`);
+    }
+
+    await repo.updateStatus(transfer.id, "executing");
 
     await new Promise((resolve) => setTimeout(resolve, 1500));
 
-    if (BigInt(executing.amountAtomic) <= 0n) {
-      return markTransferFailed(
-        executing,
-        "amountAtomic must be positive"
-      );
+    if (BigInt(transfer.amountAtomic) <= 0n) {
+      return repo.updateStatus(transfer.id, "failed", {
+        failureReason: "amountAtomic must be positive"
+      });
     }
 
-    return markTransferConfirmed(
-      executing,
-      `simulated-${executing.id}`
-    );
+    return repo.updateStatus(transfer.id, "confirmed", {
+      txHash: `simulated-${transfer.id}`
+    });
   },
   {
     connection: redisConnection,
-    concurrency: 5,
+    concurrency: 5
   }
 );
 

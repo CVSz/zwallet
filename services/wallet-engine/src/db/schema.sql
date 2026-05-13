@@ -46,3 +46,18 @@ CREATE TABLE IF NOT EXISTS wallet_audit_log (
   payload JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE wallet_balances
+ADD COLUMN IF NOT EXISTS decimals INTEGER;
+
+ALTER TABLE wallet_transfers
+ADD COLUMN IF NOT EXISTS tx_hash TEXT;
+
+ALTER TABLE wallet_transfers
+ADD COLUMN IF NOT EXISTS failure_reason TEXT;
+
+ALTER TABLE wallet_transfers
+ADD COLUMN IF NOT EXISTS queued_at TIMESTAMPTZ;
+
+ALTER TABLE wallet_transfers
+ADD COLUMN IF NOT EXISTS executed_at TIMESTAMPTZ;
