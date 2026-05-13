@@ -1,4 +1,5 @@
 {
+<<<<<<< HEAD
   "compilerOptions": {
     "target": "ES2022",
     "module": "NodeNext",
@@ -14,4 +15,20 @@
   },
   "include": ["src/**/*.ts"],
   "exclude": ["dist", "node_modules"]
+=======
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "strict": true,
+    "declaration": true,
+    "sourceMap": true
+  },
+  "include": ["src/**/*.ts"]
+>>>>>>> d391426dc2ebe3fb1ccb6821a18a49fd8c67511e
 }
