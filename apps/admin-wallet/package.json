@@ -8,7 +8,10 @@
     "start": "node dist/server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
-  "dependencies": {},
+  "dependencies": {
+    "@zwallet/shared-types": "workspace:*",
+    "@zwallet/wallet-engine": "workspace:*"
+  },
   "devDependencies": {
     "@types/node": "^22.15.3",
     "typescript": "^5.8.3"
