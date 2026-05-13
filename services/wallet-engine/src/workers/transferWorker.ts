@@ -2,6 +2,8 @@ import { Worker } from "bullmq";
 
 import { redisConnection } from "../queue/redis.js";
 import { PostgresTransferRepository } from "../repositories/postgres/transfers.js";
+import { getChainAdapter } from "../chains/index.js";
+import { signTransferSimulation } from "../signing/index.js";
 
 const repo = process.env.DATABASE_URL
   ? new PostgresTransferRepository()
@@ -24,7 +26,7 @@ const worker = new Worker(
 
     await repo.updateStatus(transfer.id, "executing");
 
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
 
     if (BigInt(transfer.amountAtomic) <= 0n) {
       return repo.updateStatus(transfer.id, "failed", {
@@ -32,8 +34,13 @@ const worker = new Worker(
       });
     }
 
+    const adapter = getChainAdapter(transfer.chain);
+    await adapter.estimateFee(transfer);
+    await signTransferSimulation(transfer);
+    const broadcast = await adapter.broadcastTransfer(transfer);
+
     return repo.updateStatus(transfer.id, "confirmed", {
-      txHash: `simulated-${transfer.id}`
+      txHash: broadcast.txHash
     });
   },
   {
@@ -43,17 +50,11 @@ const worker = new Worker(
 );
 
 worker.on("completed", (job, result) => {
-  console.log(
-    `[transfer-worker] completed ${job.id}`,
-    result?.status
-  );
+  console.log(`[transfer-worker] completed ${job.id}`, result?.status, result?.txHash);
 });
 
 worker.on("failed", (job, err) => {
-  console.error(
-    `[transfer-worker] failed ${job?.id}`,
-    err
-  );
+  console.error(`[transfer-worker] failed ${job?.id}`, err);
 });
 
 console.log("[transfer-worker] started");
