@@ -1,0 +1,53 @@
+import pg from "pg";
+
+const { Pool } = pg;
+
+const pool = new Pool({
+  connectionString:
+    process.env.DATABASE_URL ??
+    "postgres://postgres:postgres@localhost:5432/zwallet",
+});
+
+export async function createPendingTransaction(
+  input: {
+    transferId: string;
+    txHash: string;
+    chain: string;
+    nonce: number;
+  }
+) {
+  await pool.query(
+    `
+    INSERT INTO wallet_pending_transactions (
+      transfer_id,
+      tx_hash,
+      chain,
+      nonce,
+      status
+    )
+    VALUES ($1,$2,$3,$4,$5)
+    `,
+    [
+      input.transferId,
+      input.txHash,
+      input.chain,
+      input.nonce,
+      "pending",
+    ]
+  );
+}
+
+export async function markPendingConfirmed(
+  transferId: string
+) {
+  await pool.query(
+    `
+    UPDATE wallet_pending_transactions
+    SET
+      status = 'confirmed',
+      updated_at = NOW()
+    WHERE transfer_id = $1
+    `,
+    [transferId]
+  );
+}

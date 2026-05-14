@@ -1,46 +1,198 @@
-import { Worker } from "bullmq";
-import { createRedisConnection } from "../queue/redis.js";
+import {
+  Worker,
+} from "bullmq";
+
+import {
+  createRedisConnection,
+} from "../queue/redis.js";
+
 import {
   getTransferById,
   updateTransferStatus,
 } from "../repositories/postgres/transfers.js";
-import { broadcastTransfer } from "../adapters/index.js";
 
-const worker = new Worker(
-  "transfer-execution",
-  async (job) => {
-    console.log("[transfer-worker] received job", job.id, job.data);
+import {
+  allocateNonce,
+} from "../repositories/postgres/nonces.js";
 
-    const transfer = await getTransferById(String(job.data.transferId));
+import {
+  createPendingTransaction,
+  markPendingConfirmed,
+} from "../repositories/postgres/pendingTransactions.js";
 
-    if (!transfer) {
-      throw new Error("transfer not found");
+import {
+  getSigningKeyForAddress,
+} from "../repositories/postgres/signingKeys.js";
+
+import {
+  appendSigningAudit,
+} from "../repositories/postgres/signingAudit.js";
+
+import {
+  assertSigningAllowed,
+} from "../policy/signingPolicy.js";
+
+import {
+  signTransfer,
+} from "../signers/index.js";
+
+import {
+  broadcastTransfer,
+} from "../adapters/index.js";
+
+const worker =
+  new Worker(
+    "transfer-execution",
+
+    async (job) => {
+
+      const transfer =
+        await getTransferById(
+          String(
+            job.data.transferId
+          )
+        );
+
+      if (!transfer) {
+        throw new Error(
+          "transfer not found"
+        );
+      }
+
+      await updateTransferStatus(
+        transfer.id,
+        "executing"
+      );
+
+      const key =
+        await getSigningKeyForAddress(
+          transfer.chain,
+          transfer.from
+        );
+
+      if (!key) {
+        throw new Error(
+          `no signing key for ${transfer.from}`
+        );
+      }
+
+      assertSigningAllowed(
+        transfer,
+        key
+      );
+
+      const nonce =
+        await allocateNonce(
+          transfer.chain,
+          transfer.from
+        );
+
+      await appendSigningAudit({
+        transferId:
+          transfer.id,
+
+        chain:
+          transfer.chain,
+
+        address:
+          transfer.from,
+
+        provider:
+          key.provider,
+
+        keyRef:
+          key.keyRef,
+
+        action:
+          "sign.requested",
+
+        status:
+          "started",
+      });
+
+      await signTransfer({
+        transfer,
+        key,
+        nonce,
+      });
+
+      await appendSigningAudit({
+        transferId:
+          transfer.id,
+
+        chain:
+          transfer.chain,
+
+        address:
+          transfer.from,
+
+        provider:
+          key.provider,
+
+        keyRef:
+          key.keyRef,
+
+        action:
+          "sign.completed",
+
+        status:
+          "success",
+      });
+
+      const broadcast =
+        await broadcastTransfer({
+          ...transfer,
+          nonce,
+        });
+
+      await createPendingTransaction({
+        transferId:
+          transfer.id,
+
+        txHash:
+          broadcast.txHash,
+
+        chain:
+          transfer.chain,
+
+        nonce,
+      });
+
+      await updateTransferStatus(
+        transfer.id,
+        "broadcasted",
+        {
+          txHash:
+            broadcast.txHash,
+        }
+      );
+
+      await new Promise(
+        (resolve) =>
+          setTimeout(
+            resolve,
+            2000
+          )
+      );
+
+      await markPendingConfirmed(
+        transfer.id
+      );
+
+      return updateTransferStatus(
+        transfer.id,
+        "confirmed"
+      );
+    },
+
+    {
+      connection:
+        createRedisConnection(),
+
+      concurrency: 5,
     }
+  );
 
-    await updateTransferStatus(transfer.id, "executing");
-
-    const broadcast = await broadcastTransfer(transfer);
-
-    const updated = await updateTransferStatus(transfer.id, "confirmed", {
-      txHash: broadcast.txHash,
-    });
-
-    console.log("[transfer-worker] completed", updated.id, updated.txHash);
-
-    return updated;
-  },
-  {
-    connection: createRedisConnection(),
-    concurrency: 5,
-  }
+console.log(
+  "[wallet-engine] transfer worker online"
 );
-
-worker.on("completed", (job) => {
-  console.log("[transfer-worker] BullMQ completed", job.id);
-});
-
-worker.on("failed", (job, err) => {
-  console.error("[transfer-worker] failed", job?.id, err);
-});
-
-console.log("[wallet-engine] transfer worker online");
