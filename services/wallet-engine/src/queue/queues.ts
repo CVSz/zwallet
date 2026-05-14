@@ -1,10 +1,10 @@
 import { Queue } from "bullmq";
-import { redisConnection } from "./redis.js";
+import { createRedisConnection } from "./redis.js";
 
 export const transferExecutionQueue = new Queue(
   "transfer-execution",
   {
-    connection: redisConnection,
+    connection: createRedisConnection(),
     defaultJobOptions: {
       attempts: 5,
       backoff: {

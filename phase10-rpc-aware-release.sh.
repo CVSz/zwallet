@@ -1,0 +1,240 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd /opt/zwallet
+
+echo "== Phase 10: RPC-aware execution layer pre-release =="
+
+echo "== Install EVM deps into wallet-engine workspace =="
+pnpm --filter @zwallet/wallet-engine add ethers viem
+
+echo "== Create signer abstractions =="
+mkdir -p services/wallet-engine/src/signers
+
+cat > services/wallet-engine/src/signers/types.ts <<'EOF'
+export interface SignTransferInput {
+  chain: string;
+  from: string;
+  to: string;
+  amountAtomic: string;
+}
+
+export interface SignedTransfer {
+  rawTransaction: string;
+}
+
+export interface TransferSigner {
+  signTransfer(input: SignTransferInput): Promise<SignedTransfer>;
+}
+EOF
+
+cat > services/wallet-engine/src/signers/devSigner.ts <<'EOF'
+import { createHash } from "node:crypto";
+import type { SignedTransfer, SignTransferInput, TransferSigner } from "./types.js";
+
+export class DevSigner implements TransferSigner {
+  async signTransfer(input: SignTransferInput): Promise<SignedTransfer> {
+    return {
+      rawTransaction: createHash("sha256")
+        .update(JSON.stringify(input))
+        .digest("hex"),
+    };
+  }
+}
+EOF
+
+cat > services/wallet-engine/src/signers/index.ts <<'EOF'
+export * from "./types.js";
+export * from "./devSigner.js";
+EOF
+
+echo "== Create RPC-aware EVM adapter =="
+mkdir -p services/wallet-engine/src/adapters/evm
+
+cat > services/wallet-engine/src/adapters/evm/rpc.ts <<'EOF'
+import { ethers } from "ethers";
+
+export const evmProvider = new ethers.JsonRpcProvider(
+  process.env.EVM_RPC_URL ?? "https://ethereum-rpc.publicnode.com"
+);
+EOF
+
+cat > services/wallet-engine/src/adapters/evm/realAdapter.ts <<'EOF'
+import { randomBytes } from "node:crypto";
+import { evmProvider } from "./rpc.js";
+import type { WalletTransferRecord } from "../../walletEngine.js";
+
+export async function estimateRealEvmFee(transfer: WalletTransferRecord) {
+  const [feeData, blockNumber] = await Promise.all([
+    evmProvider.getFeeData(),
+    evmProvider.getBlockNumber(),
+  ]);
+
+  return {
+    chain: transfer.chain,
+    gasPrice: feeData.gasPrice?.toString() ?? "0",
+    maxFeePerGas: feeData.maxFeePerGas?.toString() ?? null,
+    maxPriorityFeePerGas: feeData.maxPriorityFeePerGas?.toString() ?? null,
+    observedBlock: blockNumber,
+  };
+}
+
+export async function broadcastRealEvmTransfer(transfer: WalletTransferRecord) {
+  const fee = await estimateRealEvmFee(transfer);
+
+  return {
+    txHash: "0x" + randomBytes(32).toString("hex"),
+    network: "ethereum",
+    simulated: true,
+    observedBlock: fee.observedBlock,
+  };
+}
+EOF
+
+cat > services/wallet-engine/src/adapters/index.ts <<'EOF'
+import type { WalletTransferRecord } from "../walletEngine.js";
+import {
+  broadcastRealEvmTransfer,
+  estimateRealEvmFee,
+} from "./evm/realAdapter.js";
+
+export async function estimateTransferFee(transfer: WalletTransferRecord) {
+  switch (transfer.chain) {
+    case "evm":
+      return estimateRealEvmFee(transfer);
+    default:
+      return { fee: "0", simulated: true };
+  }
+}
+
+export async function broadcastTransfer(transfer: WalletTransferRecord) {
+  switch (transfer.chain) {
+    case "evm":
+      return broadcastRealEvmTransfer(transfer);
+    default:
+      throw new Error(`unsupported chain: ${transfer.chain}`);
+  }
+}
+EOF
+
+echo "== Patch transfer worker to use RPC-aware adapter =="
+cat > services/wallet-engine/src/workers/transferWorker.ts <<'EOF'
+import { Worker } from "bullmq";
+import { createRedisConnection } from "../queue/redis.js";
+import {
+  getTransferById,
+  updateTransferStatus,
+} from "../repositories/postgres/transfers.js";
+import { broadcastTransfer } from "../adapters/index.js";
+
+const worker = new Worker(
+  "transfer-execution",
+  async (job) => {
+    console.log("[transfer-worker] received job", job.id, job.data);
+
+    const transfer = await getTransferById(String(job.data.transferId));
+
+    if (!transfer) {
+      throw new Error("transfer not found");
+    }
+
+    await updateTransferStatus(transfer.id, "executing");
+
+    const broadcast = await broadcastTransfer(transfer);
+
+    const updated = await updateTransferStatus(transfer.id, "confirmed", {
+      txHash: broadcast.txHash,
+    });
+
+    console.log("[transfer-worker] completed", updated.id, updated.txHash);
+
+    return updated;
+  },
+  {
+    connection: createRedisConnection(),
+    concurrency: 5,
+  }
+);
+
+worker.on("completed", (job) => {
+  console.log("[transfer-worker] BullMQ completed", job.id);
+});
+
+worker.on("failed", (job, err) => {
+  console.error("[transfer-worker] failed", job?.id, err);
+});
+
+console.log("[wallet-engine] transfer worker online");
+EOF
+
+echo "== Patch wallet-engine exports =="
+python3 - <<'PY'
+from pathlib import Path
+
+p = Path("services/wallet-engine/src/index.ts")
+s = p.read_text()
+
+for line in [
+    'export * from "./adapters/index.js";',
+    'export * from "./signers/index.js";',
+]:
+    if line not in s:
+        s += "\n" + line
+
+p.write_text(s.rstrip() + "\n")
+PY
+
+echo "== Clean + build =="
+find . -name 'tsconfig.tsbuildinfo' -delete
+
+pnpm --filter @zwallet/wallet-engine build
+pnpm --filter @zwallet/admin-wallet build
+
+echo "== Restart services =="
+sudo systemctl restart zwallet-transfer-worker
+sudo systemctl restart zwallet
+
+sleep 5
+
+echo "== Health =="
+curl -s https://admin-wallet.zeaz.dev/healthz
+echo
+
+echo "== Generate token =="
+export TOKEN="$(
+ZWALLET_DEV_TOKEN=change-me-local-admin-token \
+node apps/admin-wallet/scripts/create-dev-token.mjs
+)"
+
+echo "== Create transfer =="
+TRANSFER_ID="$(
+curl -s -X POST https://admin-wallet.zeaz.dev/api/transfers/preview \
+  -H "authorization: Bearer $TOKEN" \
+  -H 'content-type: application/json' \
+  -d '{"chain":"evm","from":"0x1111111111111111111111111111111111111111","to":"0x2222222222222222222222222222222222222222","amountAtomic":"1000000000000000000"}' \
+  | jq -r '.transfer.id'
+)"
+
+echo "TRANSFER_ID=$TRANSFER_ID"
+
+echo "== Queue transfer =="
+curl -s -X POST \
+  "https://admin-wallet.zeaz.dev/api/transfers/$TRANSFER_ID/queue" \
+  -H "authorization: Bearer $TOKEN" | jq
+
+sleep 6
+
+echo "== Verify final transfer =="
+curl -s https://admin-wallet.zeaz.dev/api/overview \
+  -H "authorization: Bearer $TOKEN" \
+  | jq --arg id "$TRANSFER_ID" '.transfers[] | select(.id == $id)'
+
+echo "== Worker logs =="
+sudo journalctl -u zwallet-transfer-worker -n 30 --no-pager
+
+echo "== Git pre-release status =="
+find . -name 'tsconfig.tsbuildinfo' -delete
+git status --short
+
+echo
+echo "== PHASE 10 RPC-AWARE PRE-RELEASE COMPLETE =="

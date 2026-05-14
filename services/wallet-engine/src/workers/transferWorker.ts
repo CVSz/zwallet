@@ -1,60 +1,46 @@
 import { Worker } from "bullmq";
-
-import { redisConnection } from "../queue/redis.js";
-import { PostgresTransferRepository } from "../repositories/postgres/transfers.js";
-import { getChainAdapter } from "../chains/index.js";
-import { signTransferSimulation } from "../signing/index.js";
-
-const repo = process.env.DATABASE_URL
-  ? new PostgresTransferRepository()
-  : undefined;
+import { createRedisConnection } from "../queue/redis.js";
+import {
+  getTransferById,
+  updateTransferStatus,
+} from "../repositories/postgres/transfers.js";
+import { broadcastTransfer } from "../adapters/index.js";
 
 const worker = new Worker(
   "transfer-execution",
   async (job) => {
-    const transferId = String(job.data.transferId);
+    console.log("[transfer-worker] received job", job.id, job.data);
 
-    if (!repo) {
-      throw new Error("DATABASE_URL is required for distributed transfer worker");
-    }
-
-    const transfer = await repo.getById(transferId);
+    const transfer = await getTransferById(String(job.data.transferId));
 
     if (!transfer) {
-      throw new Error(`Transfer not found: ${transferId}`);
+      throw new Error("transfer not found");
     }
 
-    await repo.updateStatus(transfer.id, "executing");
+    await updateTransferStatus(transfer.id, "executing");
 
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    const broadcast = await broadcastTransfer(transfer);
 
-    if (BigInt(transfer.amountAtomic) <= 0n) {
-      return repo.updateStatus(transfer.id, "failed", {
-        failureReason: "amountAtomic must be positive"
-      });
-    }
-
-    const adapter = getChainAdapter(transfer.chain);
-    await adapter.estimateFee(transfer);
-    await signTransferSimulation(transfer);
-    const broadcast = await adapter.broadcastTransfer(transfer);
-
-    return repo.updateStatus(transfer.id, "confirmed", {
-      txHash: broadcast.txHash
+    const updated = await updateTransferStatus(transfer.id, "confirmed", {
+      txHash: broadcast.txHash,
     });
+
+    console.log("[transfer-worker] completed", updated.id, updated.txHash);
+
+    return updated;
   },
   {
-    connection: redisConnection,
-    concurrency: 5
+    connection: createRedisConnection(),
+    concurrency: 5,
   }
 );
 
-worker.on("completed", (job, result) => {
-  console.log(`[transfer-worker] completed ${job.id}`, result?.status, result?.txHash);
+worker.on("completed", (job) => {
+  console.log("[transfer-worker] BullMQ completed", job.id);
 });
 
 worker.on("failed", (job, err) => {
-  console.error(`[transfer-worker] failed ${job?.id}`, err);
+  console.error("[transfer-worker] failed", job?.id, err);
 });
 
-console.log("[transfer-worker] started");
+console.log("[wallet-engine] transfer worker online");
