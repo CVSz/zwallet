@@ -37,3 +37,5 @@ typechain-types/
 coverage/
 .nyc_output/
 *.log
+venv/
+.venv/

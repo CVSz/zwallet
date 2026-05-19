@@ -75,6 +75,14 @@ async function main() {
   }
 
   console.log("\n🎉 Deployment Suite Complete.\n");
+
+  const fs = require("fs");
+  fs.writeFileSync("deployed.json", JSON.stringify({
+    zeaAddress: zeaAddr,
+    zeazAddress: zeazAddr,
+    swapAddress: swapAddr
+  }, null, 2));
+  console.log("📝 Deployed addresses saved to deployed.json\n");
 }
 
 main()

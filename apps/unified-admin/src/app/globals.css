@@ -1,0 +1,48 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #0a0a0c;
+  --foreground: #d1d5db;
+  --accent: #f59e0b; /* Amber/Caution Orange */
+  --accent-muted: #78350f;
+  --grid: #1f2937;
+  --card-bg: #111827;
+  --card-border: #374151;
+  --success: #10b981;
+  --danger: #ef4444;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: 'Inter', 'Roboto Mono', monospace;
+  background-image: 
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+@layer components {
+  .industrial-panel {
+    @apply bg-gray-900/80 border border-gray-700 backdrop-blur-md p-6 rounded-none;
+    box-shadow: 0 0 15px rgba(0, 0, 0, 0.5), inset 0 0 10px rgba(245, 158, 11, 0.05);
+    clip-path: polygon(
+      0% 0%,
+      100% 0%,
+      100% calc(100% - 15px),
+      calc(100% - 15px) 100%,
+      0% 100%
+    );
+  }
+
+  .status-tag {
+    @apply px-2 py-0.5 text-xs font-mono uppercase tracking-tighter border;
+  }
+
+  .btn-industrial {
+    @apply px-4 py-2 bg-amber-600 hover:bg-amber-500 text-black font-bold uppercase transition-all duration-200;
+    clip-path: polygon(10% 0, 100% 0, 90% 100%, 0 100%);
+  }
+}

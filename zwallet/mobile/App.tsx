@@ -86,12 +86,22 @@ export default function App() {
 
     setIsLoading(true);
     setError('');
-    setStatus('Initializing MPC Ceremony...');
-    setCeremonyState('Aggregating Shares...');
-
     try {
-      // Simulate MPC Ceremony Timing
+      // Simulate Deep Analysis & Policy Check
+      setStatus('Simulating Transaction intent...');
+      await new Promise(r => setTimeout(r, 800));
+      
+      setStatus('Scanning behavioral vectors...');
+      await new Promise(r => setTimeout(r, 600));
+
+      setStatus('Verifying MPC Participant Attestation...');
+      setCeremonyState('Checking Enclave Health...');
+      await new Promise(r => setTimeout(r, 1000));
+
+      setStatus('Orchestrating Threshold Ceremony...');
+      setCeremonyState('Aggregating P2P Shares...');
       await new Promise(r => setTimeout(r, 1500));
+      
       setCeremonyState('Finalizing TSS Signature...');
       await new Promise(r => setTimeout(r, 1000));
 
