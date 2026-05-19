@@ -4,9 +4,6 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
-overrides:
-  ws: '>=8.20.1'
-
 importers:
 
   .:
@@ -63,6 +60,12 @@ importers:
         version: 3.25.76
 
   apps/world: {}
+
+  backend:
+    dependencies:
+      '@fastify/rate-limit':
+        specifier: ^10.3.0
+        version: 10.3.0
 
   backend/packages/shared:
     devDependencies:

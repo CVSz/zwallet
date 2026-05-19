@@ -4,7 +4,8 @@ pragma solidity ^0.8.20;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 
 /**
  * @title ZEASwap Engine
@@ -12,7 +13,7 @@ import "@openzeppelin/contracts/access/AccessControl.sol";
  * @notice An atomic token swap engine facilitating ZEA <-> ZEAZ exchanges.
  * @dev Uses SafeERC20 for all transfers and ReentrancyGuard for security.
  */
-contract ZEASwap is ReentrancyGuard, AccessControl {
+contract ZEASwap is ReentrancyGuard, AccessControlEnumerable, Pausable {
     using SafeERC20 for IERC20;
 
     IERC20 public immutable zea;
@@ -42,11 +43,25 @@ contract ZEASwap is ReentrancyGuard, AccessControl {
     }
 
     /**
+     * @notice Pauses all swap operations.
+     */
+    function pause() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _pause();
+    }
+
+    /**
+     * @notice Unpauses all swap operations.
+     */
+    function unpause() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _unpause();
+    }
+
+    /**
      * @notice Swaps ZEA stablecoins for ZEAZ utility tokens.
      * @dev Calculates a 0.3% fee before execution.
      * @param amountZEA The amount of ZEA to swap.
      */
-    function swapZEAforZEAZ(uint256 amountZEA) external nonReentrant {
+    function swapZEAforZEAZ(uint256 amountZEA) external nonReentrant whenNotPaused {
         if (amountZEA == 0) revert ZeroAmount();
 
         uint256 fee = (amountZEA * SWAP_FEE_BPS) / BPS_DENOMINATOR;
@@ -65,7 +80,7 @@ contract ZEASwap is ReentrancyGuard, AccessControl {
      * @dev Calculates a 0.3% fee before execution.
      * @param amountZEAZ The amount of ZEAZ to swap.
      */
-    function swapZEAZforZEA(uint256 amountZEAZ) external nonReentrant {
+    function swapZEAZforZEA(uint256 amountZEAZ) external nonReentrant whenNotPaused {
         if (amountZEAZ == 0) revert ZeroAmount();
 
         uint256 fee = (amountZEAZ * SWAP_FEE_BPS) / BPS_DENOMINATOR;
