@@ -1,0 +1,24 @@
+name: Repo Hygiene
+
+on:
+  pull_request:
+  push:
+    branches: [ main, master ]
+
+permissions:
+  contents: read
+
+jobs:
+  hygiene:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure clean git diff after generation steps
+        run: |
+          git diff --exit-code
+      - name: Verify build artifacts policy
+        run: |
+          if git ls-files --others --exclude-standard | rg -E "(dist/|build/|\.tsbuildinfo$|coverage/)"; then
+            echo "Unexpected generated artifacts present" >&2
+            exit 1
+          fi

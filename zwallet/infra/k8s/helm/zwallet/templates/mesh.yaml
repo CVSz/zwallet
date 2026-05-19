@@ -1,0 +1,24 @@
+# Service Mesh (Istio minimal config)
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: zwallet
+spec:
+  hosts:
+    - "zwallet.local"
+  http:
+    - route:
+        - destination:
+            host: zwallet-api
+            port:
+              number: 80
+---
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: zwallet-api-mtls
+spec:
+  host: zwallet-api
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL

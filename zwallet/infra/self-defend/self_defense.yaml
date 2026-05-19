@@ -1,0 +1,118 @@
+# infra/self-defend/self_defense.yaml
+# Self-defending financial system (auto-freeze + circuit breaker + kill-switch)
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: invariant-guard
+  namespace: production
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: invariant-guard
+  template:
+    metadata:
+      labels:
+        app: invariant-guard
+    spec:
+      containers:
+        - name: guard
+          image: node:20
+          command:
+            - node
+            - /app/guard.js
+          env:
+            - name: DB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: db-secret
+                  key: url
+          volumeMounts:
+            - name: guard-code
+              mountPath: /app
+      volumes:
+        - name: guard-code
+          configMap:
+            name: invariant-guard-code
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: invariant-guard-code
+  namespace: production
+data:
+  guard.js: |
+    const { Pool } = require('pg');
+    const pool = new Pool({ connectionString: process.env.DB_URL });
+
+    async function checkInvariant() {
+      const client = await pool.connect();
+      try {
+        const total = await client.query(`
+          SELECT COALESCE(SUM(
+            CASE WHEN direction='debit' THEN amount ELSE -amount END
+          ),0) as total FROM ledger_entries
+        `);
+
+        if (Number(total.rows[0].total) !== 0) {
+          throw new Error('GLOBAL ZERO-SUM VIOLATION');
+        }
+
+        const drift = await client.query(`
+          SELECT 1 FROM account_balance a
+          LEFT JOIN ledger_entries e ON e.account_id = a.account_id
+          GROUP BY a.account_id, a.balance
+          HAVING a.balance != COALESCE(SUM(
+            CASE WHEN e.direction='credit' THEN e.amount ELSE -e.amount END
+          ),0)
+          LIMIT 1
+        `);
+
+        if (drift.rows.length > 0) {
+          throw new Error('BALANCE DRIFT');
+        }
+
+        console.log('OK');
+      } finally {
+        client.release();
+      }
+    }
+
+    async function freezeSystem() {
+      const { execSync } = require('child_process');
+      console.error('FREEZING SYSTEM');
+
+      execSync('kubectl scale deploy api --replicas=0');
+      execSync('kubectl scale deploy worker --replicas=0');
+    }
+
+    async function loop() {
+      while (true) {
+        try {
+          await checkInvariant();
+        } catch (e) {
+          console.error(e.message);
+          await freezeSystem();
+          process.exit(1);
+        }
+        await new Promise(r => setTimeout(r, 5000));
+      }
+    }
+
+    loop();
+
+---
+
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: invariant-guard-pdb
+  namespace: production
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: invariant-guard

@@ -1,0 +1,11 @@
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: zwallet-deny-cross-namespace
+  namespace: zwallet
+spec:
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            namespaces: ["zwallet", "istio-system"]

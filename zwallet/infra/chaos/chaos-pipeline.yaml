@@ -1,0 +1,63 @@
+# infra/chaos/chaos-pipeline.yaml
+# End-to-end chaos + invariant verification pipeline
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: chaos-verification-pipeline
+  namespace: chaos-testing
+spec:
+  backoffLimit: 0
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: chaos-runner
+          image: bitnami/kubectl:latest
+          command:
+            - /bin/sh
+            - -c
+            - |
+              set -e
+
+              echo "[1] Apply chaos suite"
+              kubectl apply -f /manifests/chaos-suite.yaml
+
+              echo "[2] Wait for chaos to execute"
+              sleep 60
+
+              echo "[3] Run financial invariant verification"
+              kubectl apply -f /manifests/assert-ledger.yaml
+
+              echo "[4] Wait verification"
+              sleep 20
+
+              echo "[5] Check verification result"
+              STATUS=$(kubectl get jobs verify-ledger -o jsonpath='{.status.succeeded}')
+
+              if [ "$STATUS" != "1" ]; then
+                echo "❌ FINANCIAL INVARIANT VIOLATION"
+                exit 1
+              fi
+
+              echo "[6] Check duplicate processing"
+              DUP=$(kubectl exec deploy/api -- psql -U postgres -d app -t -c "
+                SELECT COUNT(*) FROM (
+                  SELECT tx_id FROM consumer_idempotency GROUP BY tx_id HAVING COUNT(*) > 1
+                ) t;")
+
+              if [ "$DUP" != "0" ]; then
+                echo "❌ DUPLICATE EFFECT DETECTED"
+                exit 1
+              fi
+
+              echo "[7] SUCCESS: system survived chaos"
+
+          volumeMounts:
+            - name: manifests
+              mountPath: /manifests
+
+      volumes:
+        - name: manifests
+          configMap:
+            name: chaos-manifests

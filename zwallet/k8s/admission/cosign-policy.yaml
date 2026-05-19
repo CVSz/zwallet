@@ -1,0 +1,29 @@
+# k8s/admission/cosign-policy.yaml
+# Enforce only signed images from GitHub Actions (keyless OIDC)
+
+apiVersion: policy.sigstore.dev/v1beta1
+kind: ClusterImagePolicy
+metadata:
+  name: require-signed-images
+spec:
+  images:
+    - glob: "ghcr.io/*"
+  authorities:
+    - keyless:
+        identities:
+          - issuer: https://token.actions.githubusercontent.com
+            subjectRegExp: ".*repo:CVSz/zwallet.*"
+---
+# Optional: restrict to specific repo image only
+apiVersion: policy.sigstore.dev/v1beta1
+kind: ClusterImagePolicy
+metadata:
+  name: require-zwallet-api-only
+spec:
+  images:
+    - glob: "ghcr.io/cvsz/zwallet/api:*"
+  authorities:
+    - keyless:
+        identities:
+          - issuer: https://token.actions.githubusercontent.com
+            subjectRegExp: ".*repo:CVSz/zwallet.*"

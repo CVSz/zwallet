@@ -1,0 +1,63 @@
+# infra/chaos/chaos-suite.yaml
+# Chaos Mesh experiment suite for distributed financial system
+
+apiVersion: chaos-mesh.org/v1alpha1
+kind: Workflow
+metadata:
+  name: financial-chaos-suite
+  namespace: chaos-testing
+spec:
+  entry: main
+  templates:
+
+  - name: main
+    templateType: Serial
+    children:
+      - kafka-network-partition
+      - postgres-kill
+      - redis-latency
+      - api-pod-kill
+
+  - name: kafka-network-partition
+    templateType: NetworkChaos
+    networkChaos:
+      action: partition
+      mode: all
+      selector:
+        labelSelectors:
+          app: kafka
+      direction: both
+      duration: "30s"
+
+  - name: postgres-kill
+    templateType: PodChaos
+    podChaos:
+      action: pod-kill
+      mode: one
+      selector:
+        labelSelectors:
+          app: postgres
+      duration: "20s"
+
+  - name: redis-latency
+    templateType: NetworkChaos
+    networkChaos:
+      action: delay
+      mode: all
+      selector:
+        labelSelectors:
+          app: redis
+      delay:
+        latency: "200ms"
+        correlation: "100"
+      duration: "30s"
+
+  - name: api-pod-kill
+    templateType: PodChaos
+    podChaos:
+      action: pod-kill
+      mode: one
+      selector:
+        labelSelectors:
+          app: api
+      duration: "15s"

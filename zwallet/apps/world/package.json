@@ -1,0 +1,12 @@
+{
+  "name": "@zwallet/world",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "start": "python -m http.server 4173 -d .",
+    "check": "node --check src/main.js",
+    "typecheck": "echo \"No TypeScript sources in world portal\"",
+    "build": "node scripts/build.mjs"
+  }
+}

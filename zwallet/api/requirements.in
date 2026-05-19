@@ -1,0 +1,31 @@
+# api/requirements.in
+
+# Core
+fastapi>=0.115.0
+uvicorn[standard]
+pydantic
+pydantic-settings
+aioredis
+
+# Database
+psycopg[binary]
+SQLAlchemy
+alembic
+
+# Security
+PyJWT[crypto]>=2.8.0
+cryptography>=42.0.0
+
+# HTTP
+httpx
+
+# Observability
+structlog
+prometheus-client
+
+# Utils
+python-dotenv
+
+# CVE patches (transitive overrides)
+starlette>=0.40.0
+pyasn1>=0.6.0
