@@ -18,3 +18,20 @@ tests
 *.log
 Dockerfile*
 docker-compose*
+
+# Next.js
+.next/
+out/
+build/
+.swc/
+
+# Hardhat
+cache/
+artifacts/
+typechain/
+typechain-types/
+
+# General
+coverage/
+.nyc_output/
+*.log
