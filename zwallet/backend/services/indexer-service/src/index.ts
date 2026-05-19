@@ -10,6 +10,9 @@ interface IndexedBlock {
 }
 
 const history: IndexedBlock[] = [];
+let totalFeesZEA = 0;
+let totalVolumeUSD = 0;
+let tradeCount = 0;
 
 app.get('/health', async () => ({ service: 'indexer-service', status: 'ok', backlog: 0 }));
 
@@ -20,21 +23,38 @@ async function processBlock(rpc: MultiRpcPool, blockNumber: number) {
   console.log(`[Indexer] Processing block ${blockNumber}...`);
   
   // Simulation: Fetch logs and transactions
+  const txCount = Math.floor(Math.random() * 5);
   const block = {
     blockNumber,
-    transactions: [
-      `0x${Math.random().toString(16).slice(2)}`,
-      `0x${Math.random().toString(16).slice(2)}`
-    ],
+    transactions: Array.from({ length: txCount }, () => `0x${Math.random().toString(16).slice(2)}`),
     processedAt: new Date().toISOString()
   };
   
+  // Simulation: Protocol Revenue Capture
+  if (txCount > 0) {
+    const volume = Math.random() * 5000;
+    const fees = volume * 0.003;
+    totalVolumeUSD += volume;
+    totalFeesZEA += fees;
+    tradeCount += txCount;
+  }
+
   history.unshift(block);
   if (history.length > 100) history.pop();
 }
 
 app.get('/v1/indexer/history', async () => {
   return history;
+});
+
+app.get('/v1/indexer/analytics', async () => {
+  return {
+    totalFeesZEA: totalFeesZEA.toFixed(4),
+    totalVolumeUSD: totalVolumeUSD.toFixed(2),
+    tradeCount,
+    avgTradeSize: tradeCount > 0 ? (totalVolumeUSD / tradeCount).toFixed(2) : 0,
+    timestamp: new Date().toISOString()
+  };
 });
 
 // Mock RPC config
