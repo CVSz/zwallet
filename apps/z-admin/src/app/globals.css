@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 :root {
   --background: #0a0a0c;
@@ -24,9 +22,14 @@ body {
   background-size: 40px 40px;
 }
 
+@theme {
+  --color-industrial-bg: #111827cc; /* gray-900/80 */
+  --color-industrial-border: #374151; /* gray-700 */
+}
+
 @layer components {
   .industrial-panel {
-    @apply bg-gray-900/80 border border-gray-700 backdrop-blur-md p-6 rounded-none;
+    @apply bg-[#111827]/80 border border-gray-700 backdrop-blur-md p-6 rounded-none;
     box-shadow: 0 0 15px rgba(0, 0, 0, 0.5), inset 0 0 10px rgba(245, 158, 11, 0.05);
     clip-path: polygon(
       0% 0%,

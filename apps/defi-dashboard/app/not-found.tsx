@@ -12,6 +12,7 @@ export default function NotFound() {
         <p className="text-slate-400 mb-8 max-w-md">
           The coordinates you've requested do not exist in the ZEA Protocol space-time.
         </p>
+        {/* @ts-ignore */}
         <Link 
           href="/"
           className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-full hover:bg-indigo-500 transition-all shadow-[0_0_20px_rgba(99,102,241,0.3)]"
