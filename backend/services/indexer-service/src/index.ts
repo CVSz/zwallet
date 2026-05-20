@@ -1,29 +1,73 @@
+import 'dotenv/config';
 import Fastify from 'fastify';
-import { IndexerWorker, InMemoryQueue } from './worker.js';
-import { PostgresStateStore } from './state-store.js';
+import { MultiRpcPool, createFetchRpcClient } from '@zwallet/rpc';
 
 const app = Fastify({ logger: true });
 
-const queue = new InMemoryQueue();
-const stateStore = new PostgresStateStore();
-const worker = new IndexerWorker(queue, stateStore);
+interface IndexedBlock {
+  blockNumber: number;
+  transactions: string[];
+  processedAt: string;
+}
 
-app.get('/health', async () => ({
-  service: 'indexer-service',
-  status: 'ok',
-  timestamp: new Date().toISOString(),
-}));
+const history: IndexedBlock[] = [];
+let totalFeesZEA = 0;
+let totalVolumeUSD = 0;
+let tradeCount = 0;
 
-app.post<{ Body: { messages: unknown[] } }>('/queue/publish', async (req) => {
-  for (const message of req.body.messages) {
-    await queue.publish(message);
+app.get('/health', async () => ({ service: 'indexer-service', status: 'ok', backlog: 0 }));
+
+/**
+ * Simulates the ingestion of a new block.
+ */
+async function processBlock(rpc: MultiRpcPool, blockNumber: number) {
+  console.log(`[Indexer] Processing block ${blockNumber}...`);
+  
+  // Simulation: Fetch logs and transactions
+  const txCount = Math.floor(Math.random() * 5);
+  const block = {
+    blockNumber,
+    transactions: Array.from({ length: txCount }, () => `0x${Math.random().toString(16).slice(2)}`),
+    processedAt: new Date().toISOString()
+  };
+  
+  // Simulation: Protocol Revenue Capture
+  if (txCount > 0) {
+    const volume = Math.random() * 5000;
+    const fees = volume * 0.003;
+    totalVolumeUSD += volume;
+    totalFeesZEA += fees;
+    tradeCount += txCount;
   }
-  return { accepted: req.body.messages.length };
+
+  history.unshift(block);
+  if (history.length > 100) history.pop();
+}
+
+app.get('/v1/indexer/history', async () => {
+  return history;
 });
 
-app.post('/worker/run-once', async () => {
-  const processed = await worker.drainOnce();
-  return { processed };
+app.get('/v1/indexer/analytics', async () => {
+  return {
+    totalFeesZEA: totalFeesZEA.toFixed(4),
+    totalVolumeUSD: totalVolumeUSD.toFixed(2),
+    tradeCount,
+    avgTradeSize: tradeCount > 0 ? (totalVolumeUSD / tradeCount).toFixed(2) : 0,
+    timestamp: new Date().toISOString()
+  };
 });
 
-await app.listen({ port: Number(process.env.PORT ?? 0), host: '0.0.0.0' });
+// Mock RPC config
+const rpcPool = new MultiRpcPool([
+  { id: 'primary', chain: 'evm', url: 'http://localhost:8545', priority: 100 }
+], createFetchRpcClient);
+
+// Start ingestion loop
+setInterval(() => {
+  const lastBlock = history[0]?.blockNumber || 18000000;
+  processBlock(rpcPool, lastBlock + 1).catch(console.error);
+}, 12000);
+
+await app.listen({ port: 3007, host: '0.0.0.0' });
+console.log('Indexer Service listening on port 3007');

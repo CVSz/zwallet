@@ -1,20 +1,12 @@
-export * from "./walletEngine.js";
+import { MultiRpcPool, createFetchRpcClient, type RpcProvider } from '@zwallet/rpc';
 
-export {
-  createTransferPreview,
-  getTransfer,
-  getTransfers,
-  markTransferQueued,
-} from "./services/transfers/index.js";
+const rpcProviders: RpcProvider[] = [
+  { id: 'primary', chain: 'evm', url: process.env.RPC_EVM_PRIMARY ?? 'http://localhost:8545', priority: 120 },
+  { id: 'secondary', chain: 'evm', url: process.env.RPC_EVM_SECONDARY ?? 'http://localhost:8546', priority: 100 },
+  { id: 'solana-primary', chain: 'solana', url: process.env.RPC_SOLANA_PRIMARY ?? 'http://localhost:8899', priority: 110 },
+  { id: 'btc-primary', chain: 'btc', url: process.env.RPC_BTC_PRIMARY ?? 'http://localhost:8332', priority: 110 },
+];
 
-export {
-  getRuntimeWalletOverview,
-} from "./services/overview/index.js";
+export const rpcPool = new MultiRpcPool(rpcProviders, createFetchRpcClient);
 
-export * from "./chains/index.js";
-export * from "./queue/queues.js";
-export * from "./jobs/transferExecution.js";
-export * from "./signing/index.js";
-
-export * from "./adapters/index.js";
-export * from "./signers/index.js";
+export * from './walletEngine.js';

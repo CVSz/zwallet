@@ -71,10 +71,12 @@ async def login(payload: LoginRequest, session: AsyncSession = Depends(session_d
 @app.post("/v1/wallet/transfer")
 @limiter.limit("5/minute")
 async def transfer(payload: TransferRequestDTO, _: str = Depends(require_user)) -> dict:
-    tx_hash = WalletService(EthereumClient()).transfer(
-        payload.from_address, payload.to_address, payload.amount_eth, payload.private_key
+    # Removed private_key from payload. 
+    # Shifting to Orchestration flow: Validate -> Simulate -> Request Signing
+    request_id = await WalletService(EthereumClient()).request_transfer_signature(
+        payload.from_address, payload.to_address, payload.amount_eth
     )
-    return {"status": "submitted", "tx_hash": tx_hash}
+    return {"status": "pending_signature", "request_id": request_id}
 
 
 @app.post("/v1/ai/inference/transaction-anomaly", response_model=InferenceResponse)

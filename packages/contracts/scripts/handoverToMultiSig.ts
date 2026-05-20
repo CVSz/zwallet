@@ -5,14 +5,15 @@ import { ethers } from "hardhat";
  * Transfers administrative control from the deployer to a Gnosis Safe or institutional multi-sig.
  */
 async function main() {
-  const MULTISIG_ADDRESS = process.env.MULTISIG_ADDRESS;
-  if (!MULTISIG_ADDRESS) {
-    throw new Error("MULTISIG_ADDRESS environment variable is required.");
-  }
-
-  const zeaAddress = "0xZEA_ADDRESS_FROM_DEPLOYMENT";
-  const zeazAddress = "0xZEAZ_ADDRESS_FROM_DEPLOYMENT";
-  const swapAddress = "0xSWAP_ADDRESS_FROM_DEPLOYMENT";
+  const fs = require("fs");
+  const deployed = JSON.parse(fs.readFileSync("deployed.json", "utf8"));
+  
+  // Use a fallback for local testing if env is not set
+  const MULTISIG_ADDRESS = process.env.MULTISIG_ADDRESS || "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
+  
+  const zeaAddress = deployed.zeaAddress;
+  const zeazAddress = deployed.zeazAddress;
+  const swapAddress = deployed.swapAddress;
 
   const [deployer] = await ethers.getSigners();
   console.log(`\n🛡️ Initiating Administrative Handover to: ${MULTISIG_ADDRESS}`);
@@ -41,4 +42,7 @@ async function main() {
   console.log("\n✅ Handover Complete. Deployer has been removed from all administrative roles.\n");
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

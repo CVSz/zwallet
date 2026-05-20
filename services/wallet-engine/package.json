@@ -11,22 +11,16 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "import": "./dist/index.js"
     },
     "./walletEngine": {
       "types": "./dist/walletEngine.d.ts",
-      "default": "./dist/walletEngine.js"
+      "import": "./dist/walletEngine.js"
     }
   },
+  "types": "./dist/index.d.ts",
   "dependencies": {
     "@zwallet/rpc": "workspace:*",
-    "@zwallet/shared-types": "workspace:*",
-    "ethers": "^6.15.0",
-    "viem": "^2.48.11"
-  },
-  "files": [
-    "dist"
-  ],
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts"
+    "@zwallet/shared-types": "workspace:*"
+  }
 }

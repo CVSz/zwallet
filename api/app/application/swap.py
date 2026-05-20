@@ -22,40 +22,53 @@ class SwapOrchestrator:
     GAS_TOKEN_PRICE = 0.000001
 
     def fetch_quotes(self, from_token: str, to_token: str, amount: float, slippage_bps: int) -> list[RouteQuote]:
-        if amount <= 0:
-            raise ValueError("amount_must_be_positive")
-        if slippage_bps < 0 or slippage_bps > self.MAX_SLIPPAGE_BPS:
-            raise ValueError("slippage_out_of_bounds")
-        # deterministic quote curve used until provider adapters are wired.
-        quotes: list[RouteQuote] = []
-        for provider in self.PROVIDERS:
-            base_out = amount * (0.998 if provider == "1inch" else 0.997)
-            fee_penalty = 1 - (slippage_bps / 100_000)
-            expected_out = round(base_out * fee_penalty, 8)
-            route_options = (
-                [from_token, to_token],
-                [from_token, "USDC", to_token],
-            ) if amount > 1000 else ([from_token, to_token],)
+        import httpx
+        import os
+        
+        swap_service_url = os.getenv("SWAP_SERVICE_URL", "http://localhost:3006") # Assuming a port for swap-service
+        
+        with httpx.Client() as client:
+            res = client.post(
+                f"{swap_service_url}/v1/swaps/quote",
+                json={
+                    "chain": "ethereum",
+                    "tokenIn": from_token,
+                    "tokenOut": to_token,
+                    "amountIn": str(amount),
+                    "slippageBps": slippage_bps
+                }
+            )
+            if res.status_code != 200:
+                raise SwapExecutionError("Failed to fetch quotes from swap-service")
+            
+            data = res.json()
+            quotes = []
+            
+            # Convert best route and alternatives to RouteQuote
+            all_routes = [data["bestRoute"]] + data.get("alternatives", [])
+            for r in all_routes:
+                quotes.append(RouteQuote(
+                    route_id=r["routeId"],
+                    provider=r["source"],
+                    route=[leg["tokenIn"] for leg in r["legs"]] + [r["legs"][-1]["tokenOut"]],
+                    expected_out=float(r["grossOut"]),
+                    estimated_gas=int(r["estimatedGasUsd"] * 100000), # Mock gas conversion
+                    score=0.0 # Will be scored in normalize_routes
+                ))
+            return quotes
 
-            for route in route_options:
-                gas = 140_000 if len(route) == 3 else 90_000
-                score = expected_out - (gas * self.GAS_TOKEN_PRICE)
-                quotes.append(
-                    RouteQuote(
-                        route_id=f"{provider}:{'-'.join(route)}:{int(amount)}",
-                        provider=provider,
-                        route=route,
-                        expected_out=expected_out,
-                        estimated_gas=gas,
-                        score=score,
-                    )
-                )
-        return quotes
-
-    def normalize_routes(self, quotes: list[RouteQuote]) -> list[RouteQuote]:
+    def normalize_routes(self, quotes: list[RouteQuote], intelligence_context: dict | None = None) -> list[RouteQuote]:
         # sort by score descending and deduplicate route ids.
         unique: dict[str, RouteQuote] = {}
         for quote in quotes:
+            # Inject AI intelligence into the score if context is provided
+            if intelligence_context:
+                # Penalty based on anomaly risk or urgency
+                risk_penalty = intelligence_context.get("risk_score", 0) * 10
+                urgency_bonus = 1.05 if intelligence_context.get("urgency") == "high" else 1.0
+                quote.score = (quote.score * urgency_bonus) - risk_penalty
+                print(f"[SwapOrchestrator] AI Intelligence applied to {quote.route_id}: Risk Penalty {risk_penalty}, Urgency Bonus {urgency_bonus}")
+            
             unique[quote.route_id] = quote
         return sorted(unique.values(), key=lambda q: q.score, reverse=True)
 

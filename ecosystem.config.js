@@ -33,7 +33,7 @@ module.exports = {
       cwd: '/opt/zwallet/zwallet/backend/services/gateway',
       script: 'npm',
       args: 'start',
-      env: { NODE_ENV: 'production', PORT: 8080 }
+      env: { NODE_ENV: 'production', PORT: 8084 }
     },
     {
       name: 'defi-dashboard',

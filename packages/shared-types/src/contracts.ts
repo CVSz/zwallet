@@ -137,6 +137,21 @@ export const walletOpenApiSpec: OpenApiSchemaObject = {
   }
 };
 
+export const TOKENS = {
+  ZEA: {
+    symbol: 'ZEA',
+    name: 'ZEA Stablecoin',
+    decimals: 6,
+    address: '0xZEA_STABLECOIN_ADDRESS_PLACEHOLDER'
+  },
+  ZEAZ: {
+    symbol: 'ZEAZ',
+    name: 'ZEAZ Token',
+    decimals: 18,
+    address: '0xZEAZ_GOVERNANCE_ADDRESS_PLACEHOLDER'
+  }
+} as const;
+
 export const prismaSchema = `
 generator client {
   provider = "prisma-client-js"
@@ -164,5 +179,14 @@ model WalletEvent {
   occurredAt DateTime
   userId     String
   payload    Json
+}
+
+model TokenBalance {
+  id           String   @id @default(uuid())
+  walletAddress String
+  tokenSymbol   String
+  balanceAtomic String
+  updatedAt     DateTime @updatedAt
+  @@unique([walletAddress, tokenSymbol])
 }
 `.trim();

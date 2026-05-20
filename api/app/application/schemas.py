@@ -27,7 +27,6 @@ class TransferRequestDTO(BaseModel):
     from_address: str = Field(pattern=r"^0x[a-fA-F0-9]{40}$")
     to_address: str = Field(pattern=r"^0x[a-fA-F0-9]{40}$")
     amount_eth: float = Field(gt=0)
-    private_key: str = Field(min_length=64, max_length=66)
 
 
 class TransactionEventDTO(BaseModel):

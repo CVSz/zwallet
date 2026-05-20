@@ -2,3 +2,6 @@ packages:
   - 'apps/*'
   - 'services/*'
   - 'packages/*'
+  - 'zwallet/backend/services/*'
+  - 'zwallet/backend/packages/*'
+  - 'zwallet/packages/*'

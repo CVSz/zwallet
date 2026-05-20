@@ -21,6 +21,7 @@ describe('security attack paths', () => {
   });
 
   it('health endpoint remains public without nonce anti-replay enforcement', async () => {
+    process.env.JWT_SECRET = 'test-secret';
     const app = buildApp({ rateLimiter: fakeRedis() as any, cache: fakeRedis() as any });
 
     const first = await app.inject({
@@ -41,6 +42,7 @@ describe('security attack paths', () => {
   });
 
   it('invalid signature must fail before broadcast', async () => {
+    process.env.JWT_SECRET = 'test-secret';
     const app = buildApp({ rateLimiter: fakeRedis() as any, cache: fakeRedis() as any });
     const accessToken = await registerAndLogin(app);
 

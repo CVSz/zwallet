@@ -4,7 +4,17 @@ export class MpcProviderUnavailableError extends Error {}
 export class MpcConfigError extends Error {}
 export class MpcPolicyDeniedError extends Error {}
 
-export const mpcConfigSchema = z.object({ provider: z.enum(['sandbox']), timeoutMs: z.number().int().positive().default(500) });
+export const mpcServiceConfigSchema = z.object({
+  provider: z.enum(['sandbox', 'production']).default('sandbox'),
+  timeoutMs: z.number().int().positive().default(500)
+});
+
+export const mpcRequestSchema = z.object({
+  payload: z.string().min(2),
+  threshold: z.number().int().min(1),
+  participants: z.array(z.string()).min(1),
+  attestationToken: z.string().min(10)
+});
 
 export type MpcProvider = {
   createWallet: (userId: string) => Promise<{ walletId: string }>;

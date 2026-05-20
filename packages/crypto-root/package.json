@@ -1,0 +1,21 @@
+{
+  "name": "@zwallet/crypto-root",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint \"src/**/*.ts\" \"test/**/*.ts\"",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck:test": "tsc -p tsconfig.test.json --noEmit"
+  },
+  "dependencies": {
+    "@noble/curves": "^1.9.7",
+    "bip39": "^3.1.0",
+    "ethers": "^6.15.0",
+    "zod": "^4.1.12"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  }
+}

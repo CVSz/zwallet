@@ -7,6 +7,12 @@ import { createEventBusFromEnv, Events, type EventEnvelope } from "@zwallet/even
 
 const app = Fastify({ logger: true });
 
+const evmAddressSchema = z.string().regex(/^0x[a-fA-F0-9]{40}$/, "invalid EVM address format");
+const positiveDecimalString = z
+  .string()
+  .regex(/^\d+$/, "amount must be a positive integer string")
+  .refine((value) => BigInt(value) > 0n, "amount must be greater than zero");
+
 await app.register(rateLimit, {
   max: 100,
   timeWindow: "1 minute",
@@ -16,6 +22,31 @@ const eventBus = createEventBusFromEnv(process.env);
 await eventBus.connect();
 
 createWorldcoinReposRoute(app);
+
+app.get("/health", async () => ({ ok: true }));
+
+app.post("/transfer/preview", async (req) => {
+  const bodySchema = z.object({
+    from: evmAddressSchema,
+    to: evmAddressSchema,
+    amount: positiveDecimalString,
+    asset: z.string().min(1).max(16),
+  });
+
+  const body = bodySchema.parse(req.body);
+  const networkFee = "21000";
+  return {
+    ok: true,
+    preview: {
+      from: body.from,
+      to: body.to,
+      amount: body.amount,
+      asset: body.asset.toUpperCase(),
+      networkFee,
+      totalDebit: (BigInt(body.amount) + BigInt(networkFee)).toString(),
+    },
+  };
+});
 
 app.post("/swap/quote", async (req, reply) => {
   const bodySchema = z.object({
@@ -42,9 +73,9 @@ app.post("/swap/quote", async (req, reply) => {
 app.post('/tx/send', async (req, reply) => {
   const bodySchema = z.object({
     chainId: z.number().int().positive(),
-    from: z.string().min(1),
-    to: z.string().min(1),
-    value: z.string().min(1),
+    from: evmAddressSchema,
+    to: evmAddressSchema,
+    value: positiveDecimalString,
     nonce: z.number().int().nonnegative(),
   });
 

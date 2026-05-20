@@ -37,11 +37,19 @@ def verify_admin(credentials: HTTPAuthorizationCredentials = Depends(security)):
     return payload
 
 
-def audit_log(action: str, actor: str, target: str | None = None):
+async def audit_log(action: str, actor: str, target: str | None = None):
     safe_actor = repr(str(actor))
     safe_action = repr(str(action))
     safe_target = repr(str(target)) if target is not None else "None"
     logging.info("[%s] %s -> %s -> %s", datetime.utcnow().isoformat(), safe_actor, safe_action, safe_target)
+    
+    r = await get_redis()
+    await r.xadd("audit:stream", {
+        "timestamp": datetime.utcnow().isoformat(),
+        "actor": safe_actor,
+        "action": safe_action,
+        "target": safe_target
+    })
 
 
 @app.get("/admin/health")
@@ -67,7 +75,7 @@ async def unblock(identity: str, user=Depends(verify_admin)):
     r = await get_redis()
     await r.delete(f"block:{identity}")
 
-    audit_log("unblock", user.get("sub"), identity)
+    await audit_log("unblock", user.get("sub"), identity)
 
     return {"unblocked": identity}
 
@@ -80,7 +88,7 @@ async def shadow_unban(identity: str, user=Depends(verify_admin)):
     r = await get_redis()
     await r.delete(f"shadow:{identity}")
 
-    audit_log("shadow_unban", user.get("sub"), identity)
+    await audit_log("shadow_unban", user.get("sub"), identity)
 
     return {"shadow_unbanned": identity}
 
@@ -90,5 +98,7 @@ async def audit_logs(user=Depends(verify_admin)):
     if user.get("role") != "admin":
         raise HTTPException(status_code=403)
 
-    # placeholder: integrate with ELK / DB
-    return {"logs": "stream not implemented"}
+    # Implemented: Fetch recent logs from Redis stream
+    r = await get_redis()
+    logs = await r.xrevrange("audit:stream", count=50)
+    return {"logs": logs}

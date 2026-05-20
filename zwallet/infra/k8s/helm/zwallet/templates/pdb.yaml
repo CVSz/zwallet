@@ -1,9 +1,0 @@
-apiVersion: policy/v1
-kind: PodDisruptionBudget
-metadata:
-  name: zwallet-api
-spec:
-  minAvailable: 2
-  selector:
-    matchLabels:
-      app: zwallet-api

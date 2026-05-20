@@ -6,13 +6,18 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "import": "./dist/index.js"
     },
     "./wallet": {
       "types": "./dist/wallet.d.ts",
-      "default": "./dist/wallet.js"
+      "import": "./dist/wallet.js"
+    },
+    "./contracts": {
+      "types": "./dist/contracts.d.ts",
+      "import": "./dist/contracts.js"
     }
   },
+  "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "lint": "eslint \"src/**/*.ts\"",
@@ -20,10 +25,5 @@
   },
   "dependencies": {
     "zod": "^3.23.8"
-  },
-  "files": [
-    "dist"
-  ],
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts"
+  }
 }

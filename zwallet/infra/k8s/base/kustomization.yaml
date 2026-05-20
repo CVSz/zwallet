@@ -1,5 +1,0 @@
-resources:
-  - namespace.yaml
-  - services-apps.yaml
-  - monitoring.yaml
-  - logging-elk.yaml

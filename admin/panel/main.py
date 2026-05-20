@@ -21,17 +21,24 @@ def health(_: None = Depends(verify_admin)):
     return {"status": "ok"}
 
 
+import redis
+
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+r = redis.from_url(REDIS_URL, decode_responses=True)
+
 @app.get("/admin/security/metrics")
 def security_metrics(_: None = Depends(verify_admin)):
-    # placeholder: integrate Redis metrics / attack counters
+    # Actual implementation: Fetch counters from Redis
     return {
-        "blocked_requests": 0,
-        "rate_limited": 0,
-        "shadow_banned": 0
+        "blocked_requests": int(r.get("metrics:blocked_requests") or 0),
+        "rate_limited": int(r.get("metrics:rate_limited") or 0),
+        "shadow_banned": int(r.get("metrics:shadow_banned") or 0)
     }
 
 
 @app.post("/admin/security/unblock")
 def unblock(identity: str, _: None = Depends(verify_admin)):
-    # TODO: integrate Redis delete block key
-    return {"unblocked": identity}
+    # Implemented: Redis delete block key
+    key = f"rl:global:{identity}"
+    deleted = r.delete(key)
+    return {"unblocked": identity, "key_removed": deleted > 0}

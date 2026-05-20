@@ -57,17 +57,19 @@ flowchart LR
 ### 4.2 Gateway (backend/services/gateway)
 - Acts as the edge/API composition service.
 - Enforces request validation/security plugins.
+- **Unified Intelligence**: Consults the Python AI service for real-time risk scores and swap recommendations before orchestration.
 - Coordinates policy, card, liquidity, risk, AA bundler, and MPC adapters.
 - Includes RPC provider pool logic and integration/e2e/unit tests.
 
 ### 4.3 Transaction orchestration
 - `backend/services/tx-orchestrator` and gateway transaction modules implement lifecycle control.
+- **Zero-Trust Signing**: Private keys are NEVER accepted by the backend. All signing is handled via secure MPC ceremonies or Account Abstraction UserOperations.
 - Expected transaction pipeline:
   1. Input validation
-  2. Simulation/dry-run
-  3. Gas estimation
-  4. Nonce management
-  5. Signing (client/MPC boundary)
+  2. AI Intelligence (Risk/Anomaly check)
+  3. Simulation/dry-run
+  4. Gas estimation
+  5. Signing (MPC ceremony or AA UserOp)
   6. Broadcast through trusted RPC set
   7. Confirmation tracking
 

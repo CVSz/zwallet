@@ -5,9 +5,11 @@ import { ethers } from "hardhat";
  * Funds the ZEASwap engine with its starting reserves.
  */
 async function main() {
-  const zeaAddress = "0xZEA_ADDRESS_FROM_DEPLOYMENT";
-  const zeazAddress = "0xZEAZ_ADDRESS_FROM_DEPLOYMENT";
-  const swapAddress = "0xSWAP_ADDRESS_FROM_DEPLOYMENT";
+  const fs = require("fs");
+  const deployed = JSON.parse(fs.readFileSync("deployed.json", "utf8"));
+  const zeaAddress = deployed.zeaAddress;
+  const zeazAddress = deployed.zeazAddress;
+  const swapAddress = deployed.swapAddress;
 
   const [deployer] = await ethers.getSigners();
   console.log(`\n💰 Provisioning Initial Liquidity for Swap Engine: ${swapAddress}`);
@@ -18,6 +20,11 @@ async function main() {
   // Initial Reserves (e.g., 100,000 ZEA and 1,000,000 ZEAZ)
   const ZEA_LIQUIDITY = ethers.parseUnits("100000", 6);
   const ZEAZ_LIQUIDITY = ethers.parseUnits("1000000", 18);
+
+  const MINTER_ROLE = await ZEA.MINTER_ROLE();
+  console.log("   - Granting MINTER_ROLE to deployer temporarily...");
+  await (await ZEA.grantRole(MINTER_ROLE, deployer.address)).wait();
+  await (await ZEAZ.grantRole(MINTER_ROLE, deployer.address)).wait();
 
   // 1. Mint ZEA to Swap Engine
   console.log("   - Minting 100,000 ZEA to vault...");
@@ -30,4 +37,7 @@ async function main() {
   console.log("\n✅ Liquidity Provisioning Complete. Swap engine is now functional.\n");
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});
